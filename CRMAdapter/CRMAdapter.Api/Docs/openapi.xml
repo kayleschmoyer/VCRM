@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  File: openapi.xml
+  Summary: Placeholder XML documentation file generated at build time for Swagger annotations.
+-->
+<doc>
+  <assembly>
+    <name>CRMAdapter.Api</name>
+  </assembly>
+  <members>
+  </members>
+</doc>
