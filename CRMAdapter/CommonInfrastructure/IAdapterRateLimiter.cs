@@ -62,4 +62,55 @@ namespace CRMAdapter.CommonInfrastructure
             return Task.FromResult<IDisposable>(EmptyLease.Instance);
         }
     }
+
+    /// <summary>
+    /// Provides a semaphore-based limiter that caps concurrent operations.
+    /// </summary>
+    public sealed class SemaphoreAdapterRateLimiter : IAdapterRateLimiter
+    {
+        private readonly SemaphoreSlim _semaphore;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SemaphoreAdapterRateLimiter"/> class.
+        /// </summary>
+        /// <param name="maxConcurrency">Maximum number of concurrent operations allowed.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="maxConcurrency"/> is less than or equal to zero.</exception>
+        public SemaphoreAdapterRateLimiter(int maxConcurrency)
+        {
+            if (maxConcurrency <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxConcurrency), "Concurrency must be positive.");
+            }
+
+            _semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+        }
+
+        /// <inheritdoc />
+        public async Task<IDisposable> AcquireAsync(string resourceKey, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(resourceKey))
+            {
+                throw new ArgumentException("Resource key must be supplied.", nameof(resourceKey));
+            }
+
+            await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return new Releaser(_semaphore);
+        }
+
+        private sealed class Releaser : IDisposable
+        {
+            private readonly SemaphoreSlim _semaphore;
+            private int _disposed;
+
+            public Releaser(SemaphoreSlim semaphore) => _semaphore = semaphore;
+
+            public void Dispose()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                {
+                    _semaphore.Release();
+                }
+            }
+        }
+    }
 }

@@ -60,7 +60,12 @@ stages:
 
           - script: |
               if [ -f CRMAdapter/Tests/SecurityTests/Secrets_Gitleaks.toml ]; then
-                curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz | tar zx
+                set -euo pipefail
+                curl -sSLO https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_checksums.txt
+                curl -sSLO https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz
+                grep 'gitleaks_8.18.1_linux_x64.tar.gz' gitleaks_8.18.1_checksums.txt > gitleaks_8.18.1_linux_x64.sha256
+                sha256sum --check --status gitleaks_8.18.1_linux_x64.sha256
+                tar zxvf gitleaks_8.18.1_linux_x64.tar.gz
                 ./gitleaks detect --no-banner --source . --config CRMAdapter/Tests/SecurityTests/Secrets_Gitleaks.toml
               fi
             displayName: Secret Scan (gitleaks)
@@ -78,12 +83,16 @@ stages:
           - checkout: self
 
           - script: |
-              docker run --rm -v "$(System.DefaultWorkingDirectory)/CRMAdapter/Tests/LoadTests/k6:/scripts" grafana/k6 \
+              docker run --rm --pull=always --platform linux/amd64 \
+                -v "$(System.DefaultWorkingDirectory)/CRMAdapter/Tests/LoadTests/k6:/scripts" \
+                grafana/k6@sha256:10683d5b3803e61567476136b6dcf4ac06df67bdc4a1c9fbbeab61bc916ccd77 \
                 run /scripts/customer-list-load.test.js --vus 10 --duration 1m --out json=/scripts/customer-load.json
             displayName: Customer list load test
 
           - script: |
-              docker run --rm -v "$(System.DefaultWorkingDirectory)/CRMAdapter/Tests/LoadTests/k6:/scripts" grafana/k6 \
+              docker run --rm --pull=always --platform linux/amd64 \
+                -v "$(System.DefaultWorkingDirectory)/CRMAdapter/Tests/LoadTests/k6:/scripts" \
+                grafana/k6@sha256:10683d5b3803e61567476136b6dcf4ac06df67bdc4a1c9fbbeab61bc916ccd77 \
                 run /scripts/invoice-search-spike.test.js --out json=/scripts/invoice-spike.json
             displayName: Invoice search spike test
 

@@ -19,8 +19,8 @@ namespace CRMAdapter.CommonConfig
     /// </summary>
     public sealed class FieldMap
     {
-        private static readonly Regex SourceRegex = new("^[A-Za-z0-9_.\\[\\]]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        private static readonly Regex ExpressionRegex = new("^[A-Za-z0-9_@.,()\\[\\] ]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex SourceRegex = new(@"^\[?[A-Za-z0-9_]+\]?(?:\.\[?[A-Za-z0-9_]+\]?){1}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ColumnExpressionRegex = new(@"^\[?[A-Za-z0-9_]+\]?(?:\.\[?[A-Za-z0-9_]+\]?){2}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex CanonicalKeyRegex = new("^[A-Za-z0-9_.]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Version SupportedSchemaVersion = new(1, 0);
 
@@ -354,7 +354,7 @@ namespace CRMAdapter.CommonConfig
                         $"Entity source mapping for '{canonicalKey}' contains invalid characters.");
                 }
             }
-            else if (!ExpressionRegex.IsMatch(value))
+            else if (!ColumnExpressionRegex.IsMatch(value))
             {
                 throw new MappingConfigurationException(
                     AdapterErrorCodes.InvalidMapping,

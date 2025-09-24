@@ -28,9 +28,11 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
 
     public SqlServerContainerFixture()
     {
+        var password = Environment.GetEnvironmentVariable("TEST_SQL_SA_PASSWORD")
+            ?? throw new InvalidOperationException("Set TEST_SQL_SA_PASSWORD before running SQL integration tests.");
         var configuration = new MsSqlTestcontainerConfiguration
         {
-            Password = "VcrmUltraSecure!123",
+            Password = password,
         };
 
         _container = new TestcontainersBuilder<MsSqlTestcontainer>()
