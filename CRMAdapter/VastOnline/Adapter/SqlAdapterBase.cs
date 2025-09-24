@@ -6,6 +6,7 @@
  */
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Data;
 using System.Data.Common;
 using System.Threading;
@@ -134,7 +135,7 @@ namespace CRMAdapter.VastOnline.Adapter
         /// <param name="operation">Operation callback.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Operation result.</returns>
-        protected Task<TResult> ExecuteDbOperationAsync<TResult>(
+        protected async Task<TResult> ExecuteDbOperationAsync<TResult>(
             string operationName,
             Func<CancellationToken, Task<TResult>> operation,
             CancellationToken cancellationToken)
@@ -149,42 +150,43 @@ namespace CRMAdapter.VastOnline.Adapter
                 throw new ArgumentNullException(nameof(operation));
             }
 
-            return RetryPolicy.ExecuteAsync(async ct =>
+            using var scope = AdapterCorrelationScope.BeginScope();
+            var baseContext = new Dictionary<string, object?>
             {
-                var lease = await RateLimiter.AcquireAsync(operationName, ct).ConfigureAwait(false);
-                using (lease)
+                ["Operation"] = operationName,
+                ["Backend"] = BackendName,
+                ["CorrelationId"] = scope.CorrelationId,
+            };
+
+            var stopwatch = Stopwatch.StartNew();
+            Logger.LogInformation("CRM query started.", baseContext);
+
+            try
+            {
+                var result = await RetryPolicy.ExecuteAsync(
+                    ct => ExecuteDbOperationCoreAsync(operationName, operation, ct, baseContext, stopwatch),
+                    cancellationToken).ConfigureAwait(false);
+
+                stopwatch.Stop();
+                var completionContext = new Dictionary<string, object?>(baseContext)
                 {
-                    try
-                    {
-                        return await operation(ct).ConfigureAwait(false);
-                    }
-                    catch (AdapterException)
-                    {
-                        throw;
-                    }
-                    catch (MappingConfigurationException)
-                    {
-                        throw;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(
-                            "Adapter operation failed.",
-                            ex,
-                            new Dictionary<string, object?>
-                            {
-                                ["Operation"] = operationName,
-                                ["Backend"] = BackendName,
-                                ["ExceptionType"] = ex.GetType().FullName
-                            });
-                        throw new AdapterDataAccessException(operationName, BackendName, ex);
-                    }
+                    ["DurationMs"] = stopwatch.Elapsed.TotalMilliseconds,
+                };
+
+                Logger.LogInformation("CRM query completed.", completionContext);
+                return result;
+            }
+            catch (AdapterDataAccessException)
+            {
+                throw;
+            }
+            finally
+            {
+                if (stopwatch.IsRunning)
+                {
+                    stopwatch.Stop();
                 }
-            }, cancellationToken);
+            }
         }
 
         /// <summary>
@@ -193,7 +195,7 @@ namespace CRMAdapter.VastOnline.Adapter
         /// <param name="operationName">Operation identifier used for logging.</param>
         /// <param name="operation">Operation callback.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        protected Task ExecuteDbOperationAsync(
+        protected async Task ExecuteDbOperationAsync(
             string operationName,
             Func<CancellationToken, Task> operation,
             CancellationToken cancellationToken)
@@ -203,11 +205,54 @@ namespace CRMAdapter.VastOnline.Adapter
                 throw new ArgumentNullException(nameof(operation));
             }
 
-            return ExecuteDbOperationAsync<object?>(operationName, async ct =>
+            await ExecuteDbOperationAsync<object?>(
+                operationName,
+                async ct =>
+                {
+                    await operation(ct).ConfigureAwait(false);
+                    return null;
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task<TResult> ExecuteDbOperationCoreAsync<TResult>(
+            string operationName,
+            Func<CancellationToken, Task<TResult>> operation,
+            CancellationToken cancellationToken,
+            IReadOnlyDictionary<string, object?> baseContext,
+            Stopwatch stopwatch)
+        {
+            var lease = await RateLimiter.AcquireAsync(operationName, cancellationToken).ConfigureAwait(false);
+            using (lease)
             {
-                await operation(ct).ConfigureAwait(false);
-                return null;
-            }, cancellationToken);
+                try
+                {
+                    return await operation(cancellationToken).ConfigureAwait(false);
+                }
+                catch (AdapterException)
+                {
+                    throw;
+                }
+                catch (MappingConfigurationException)
+                {
+                    throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    var failureContext = new Dictionary<string, object?>(baseContext)
+                    {
+                        ["DurationMs"] = stopwatch.Elapsed.TotalMilliseconds,
+                        ["ExceptionType"] = ex.GetType().FullName,
+                    };
+
+                    Logger.LogError("CRM query failed.", ex, failureContext);
+                    throw new AdapterDataAccessException(operationName, BackendName, ex);
+                }
+            }
         }
 
         /// <summary>

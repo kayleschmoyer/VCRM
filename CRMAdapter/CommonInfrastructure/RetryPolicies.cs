@@ -157,6 +157,16 @@ namespace CRMAdapter.CommonInfrastructure
             _logger = logger ?? NullAdapterLogger.Instance;
         }
 
+        /// <summary>
+        /// Gets the retry configuration used by the policy.
+        /// </summary>
+        public SqlRetryOptions Options => _options;
+
+        /// <summary>
+        /// Gets the transient error detector used by the policy.
+        /// </summary>
+        public ITransientErrorDetector TransientErrorDetector => _transientErrorDetector;
+
         /// <inheritdoc />
         public async Task<TResult> ExecuteAsync<TResult>(Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
         {
