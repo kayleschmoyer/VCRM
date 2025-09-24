@@ -1,0 +1,229 @@
+@* Detail.razor: Immersive invoice workspace fusing financial clarity with customer and vehicle context. *@
+@page "/invoices/{InvoiceId:guid}"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
+@inject IInvoiceWorkspace InvoiceWorkspace
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+<MudStack Spacing="3" Class="crm-invoice-detail">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Justify="Justify.SpaceBetween">
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="NavigateBack"
+                   Color="Color.Default">
+            Back to invoices
+        </MudButton>
+        @if (_invoice is not null)
+        {
+            <MudChip Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Schedule" Class="crm-invoice-chip">
+                Due @(_invoice.DueOn.ToString("MMM dd, yyyy"))
+            </MudChip>
+        }
+    </MudStack>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="0" Class="pa-6 text-center">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else if (_invoice is null)
+    {
+        <MudPaper Elevation="1" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+            <MudText Typo="Typo.h6">Invoice not found</MudText>
+            <MudText Typo="Typo.body2" Class="mud-secondary-text">Select an invoice from the list to continue.</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4" OnClick="NavigateBack">Return to invoices</MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudStack Spacing="3">
+            <MudPaper Elevation="1" Class="crm-invoice-header">
+                <MudStack Spacing="1.5">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudStack Spacing="0.25">
+                            <MudText Typo="Typo.overline">Invoice</MudText>
+                            <MudText Typo="Typo.h4">@_invoice.InvoiceNumber</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-secondary-text">Issued @_invoice.IssuedOn.ToString("MMM dd, yyyy")</MudText>
+                        </MudStack>
+                        <StatusChip Status="@_invoice.Status" Size="Size.Medium" />
+                    </MudStack>
+                    <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd" Wrap="true">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Payments"
+                                   Disabled="@(_invoice.BalanceDue <= 0)"
+                                   OnClick="OpenPaymentDialogAsync"
+                                   data-testid="record-payment-button">
+                            Record payment
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.MarkEmailRead" Disabled="true">
+                            Send email
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PictureAsPdf" Disabled="true">
+                            Download PDF
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            <MudGrid Spacing="3">
+                <MudItem Xs="12" Lg="4">
+                    <MudStack Spacing="2">
+                        <MudPaper Elevation="1" Class="crm-invoice-relations">
+                            <MudStack Spacing="1.5">
+                                <MudStack>
+                                    <MudText Typo="Typo.overline">Customer</MudText>
+                                    <MudLink Href="@GetCustomerUrl(_invoice.Customer.Id)" Color="Color.Primary" Typo="Typo.subtitle1">
+                                        @_invoice.Customer.Name
+                                    </MudLink>
+                                    <MudText Typo="Typo.caption" Class="mud-secondary-text">@_invoice.Customer.Email</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-secondary-text">@_invoice.Customer.Phone</MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack>
+                                    <MudText Typo="Typo.overline">Vehicle</MudText>
+                                    <MudLink Href="@GetVehicleUrl(_invoice.Vehicle.Id)" Color="Color.Primary" Typo="Typo.subtitle1">
+                                        @_invoice.Vehicle.DisplayName
+                                    </MudLink>
+                                    <MudText Typo="Typo.caption" Class="mud-secondary-text">VIN @_invoice.Vehicle.Vin</MudText>
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudPaper Elevation="1" Class="crm-invoice-summary">
+                            <MudStack Spacing="1.25">
+                                <MudText Typo="Typo.h6">Summary</MudText>
+                                <MudStack>
+                                    <MudText Typo="Typo.body2">Subtotal</MudText>
+                                    <MudText Typo="Typo.subtitle2">@FormatCurrency(_invoice.Subtotal)</MudText>
+                                </MudStack>
+                                <MudStack>
+                                    <MudText Typo="Typo.body2">Tax</MudText>
+                                    <MudText Typo="Typo.subtitle2">@FormatCurrency(_invoice.Tax)</MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack>
+                                    <MudText Typo="Typo.body1" Class="mud-secondary-text">Total</MudText>
+                                    <MudText Typo="Typo.h5">@FormatCurrency(_invoice.Total)</MudText>
+                                </MudStack>
+                                <MudStack>
+                                    <MudText Typo="Typo.body2">Payments applied</MudText>
+                                    <MudText Typo="Typo.subtitle2">@FormatCurrency(_invoice.PaymentsApplied)</MudText>
+                                </MudStack>
+                                <MudStack>
+                                    <MudText Typo="Typo.body2">Balance due</MudText>
+                                    <MudText Typo="Typo.h6" Class="@(_invoice.BalanceDue > 0 ? "crm-balance-danger" : "crm-balance-clear")">
+                                        @FormatCurrency(_invoice.BalanceDue)
+                                    </MudText>
+                                </MudStack>
+                                <MudDivider />
+                                <MudStack Spacing="0.5">
+                                    <MudText Typo="Typo.subtitle2">Payment history</MudText>
+                                    @if (_invoice.Payments.Count == 0)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mud-secondary-text">No payments captured yet.</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudList Dense="true">
+                                            @foreach (var payment in _invoice.Payments)
+                                            {
+                                                <MudListItem>
+                                                    <MudStack Spacing="0.25">
+                                                        <MudText Typo="Typo.subtitle2">@FormatCurrency(payment.Amount) via @payment.Method</MudText>
+                                                        <MudText Typo="Typo.caption" Class="mud-secondary-text">@payment.PaidOn.ToString("MMM dd, yyyy")</MudText>
+                                                        @if (!string.IsNullOrWhiteSpace(payment.Notes))
+                                                        {
+                                                            <MudText Typo="Typo.caption">@payment.Notes</MudText>
+                                                        }
+                                                    </MudStack>
+                                                </MudListItem>
+                                            }
+                                        </MudList>
+                                    }
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+                </MudItem>
+                <MudItem Xs="12" Lg="8">
+                    <MudPaper Elevation="1" Class="crm-invoice-lines">
+                        <MudStack Spacing="1.5">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.h6">Line items</MudText>
+                                <MudChip Color="Color.Primary" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small">
+                                    @_invoice.LineItems.Count items
+                                </MudChip>
+                            </MudStack>
+                            <LineItemTable Items="@_invoice.LineItems" />
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public Guid InvoiceId { get; set; }
+
+    private InvoiceDetail? _invoice;
+    private bool _isLoading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _invoice = await InvoiceWorkspace.GetInvoiceAsync(InvoiceId);
+        _isLoading = false;
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/invoices");
+    }
+
+    private async Task OpenPaymentDialogAsync()
+    {
+        if (_invoice is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { nameof(PaymentDialog.BalanceDue), _invoice.BalanceDue }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            DisableBackdropClick = false
+        };
+
+        var dialog = DialogService.Show<PaymentDialog>("Record payment", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is PaymentEntry payment)
+        {
+            var updated = await InvoiceWorkspace.RecordPaymentAsync(_invoice.Id, payment);
+            if (updated is not null)
+            {
+                _invoice = updated;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private string GetCustomerUrl(Guid customerId) => $"/customers/{customerId}";
+
+    private string GetVehicleUrl(Guid vehicleId) => $"/vehicles/{vehicleId}";
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+}

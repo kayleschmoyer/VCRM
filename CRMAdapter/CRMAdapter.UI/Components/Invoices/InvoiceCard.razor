@@ -1,0 +1,104 @@
+@* InvoiceCard.razor: Compact financial summary card connecting invoices to customers and vehicles. *@
+<MudCard Class="crm-invoice-card" Elevation="1">
+    <MudCardContent>
+        <MudStack Spacing="1.5">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Spacing="0.25">
+                    <MudText Typo="Typo.overline">Invoice</MudText>
+                    <MudText Typo="Typo.h6" Class="crm-invoice-card-number">@InvoiceNumber</MudText>
+                </MudStack>
+                <StatusChip Status="@Status" />
+            </MudStack>
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Spacing="0.25">
+                    <MudText Typo="Typo.overline">Issued</MudText>
+                    <MudText Typo="Typo.subtitle2">@IssuedOn.ToString("MMM dd, yyyy")</MudText>
+                </MudStack>
+                <MudStack Spacing="0.25" AlignItems="AlignItems.End">
+                    <MudText Typo="Typo.overline">Total</MudText>
+                    <MudText Typo="Typo.subtitle2">@FormatCurrency(Total)</MudText>
+                    <MudText Typo="Typo.caption" Class="@(BalanceDue > 0 ? "crm-invoice-balance--due" : "mud-secondary-text")">
+                        Balance @FormatCurrency(BalanceDue)
+                    </MudText>
+                </MudStack>
+            </MudStack>
+
+            <MudDivider />
+
+            <MudStack Spacing="1">
+                <MudStack Spacing="0.25">
+                    <MudText Typo="Typo.overline">Customer</MudText>
+                    @if (!string.IsNullOrWhiteSpace(CustomerHref))
+                    {
+                        <MudLink Href="@CustomerHref" Color="Color.Primary">@CustomerName</MudLink>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.subtitle2">@CustomerName</MudText>
+                    }
+                </MudStack>
+                <MudStack Spacing="0.25">
+                    <MudText Typo="Typo.overline">Vehicle</MudText>
+                    @if (!string.IsNullOrWhiteSpace(VehicleHref))
+                    {
+                        <MudLink Href="@VehicleHref" Color="Color.Primary">@VehicleDescription</MudLink>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.subtitle2">@VehicleDescription</MudText>
+                    }
+                    <MudText Typo="Typo.caption" Class="mud-secondary-text">VIN @VehicleVin</MudText>
+                </MudStack>
+            </MudStack>
+
+            @if (Actions is not null)
+            {
+                <MudDivider />
+                <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                    @Actions
+                </MudStack>
+            }
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter]
+    public string InvoiceNumber { get; set; } = string.Empty;
+
+    [Parameter]
+    public DateTime IssuedOn { get; set; }
+
+    [Parameter]
+    public string Status { get; set; } = string.Empty;
+
+    [Parameter]
+    public decimal Total { get; set; }
+
+    [Parameter]
+    public decimal BalanceDue { get; set; }
+
+    [Parameter]
+    public string CustomerName { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? CustomerHref { get; set; }
+
+    [Parameter]
+    public string VehicleVin { get; set; } = string.Empty;
+
+    [Parameter]
+    public string VehicleDescription { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? VehicleHref { get; set; }
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+}

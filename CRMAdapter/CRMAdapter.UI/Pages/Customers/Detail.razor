@@ -2,6 +2,7 @@
 @page "/customers/{CustomerId:guid}"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
 @inject ICustomerDirectory CustomerDirectory
+@inject IInvoiceWorkspace InvoiceWorkspace
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-customer-detail">
@@ -79,19 +80,43 @@
                             </MudTable>
                         </MudTabPanel>
                         <MudTabPanel Text="Invoices" Icon="@Icons.Material.Filled.ReceiptLong">
-                            <MudTable Items="@_customer.Invoices" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                            <MudTable Items="@_customerInvoices"
+                                      Dense="true"
+                                      Hover="true"
+                                      Breakpoint="Breakpoint.Sm"
+                                      OnRowClick="NavigateToInvoice"
+                                      RowClassFunc="@(_ => \"crm-invoice-row\")">
                                 <HeaderContent>
                                     <MudTh>Invoice</MudTh>
                                     <MudTh>Date</MudTh>
-                                    <MudTh>Amount</MudTh>
+                                    <MudTh>Total</MudTh>
+                                    <MudTh>Balance</MudTh>
                                     <MudTh>Status</MudTh>
+                                    <MudTh class="text-right">Actions</MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
-                                    <MudTd DataLabel="Invoice">@context.InvoiceNumber</MudTd>
+                                    <MudTd DataLabel="Invoice">
+                                        <MudStack Spacing="0.25">
+                                            <MudText Typo="Typo.subtitle2">@context.InvoiceNumber</MudText>
+                                            <MudText Typo="Typo.caption" Class="mud-secondary-text">VIN @context.VehicleVin</MudText>
+                                        </MudStack>
+                                    </MudTd>
                                     <MudTd DataLabel="Date">@context.IssuedOn.ToString("MMM dd, yyyy")</MudTd>
-                                    <MudTd DataLabel="Amount">@FormatCurrency(context.Amount)</MudTd>
+                                    <MudTd DataLabel="Total">@FormatCurrency(context.Total)</MudTd>
+                                    <MudTd DataLabel="Balance">
+                                        <MudText Typo="Typo.subtitle2" Color="@(context.BalanceDue > 0 ? Color.Error : Color.Default)">
+                                            @FormatCurrency(context.BalanceDue)
+                                        </MudText>
+                                    </MudTd>
                                     <MudTd DataLabel="Status">
-                                        <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                                        <StatusChip Status="@context.Status" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Actions" Class="text-right">
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => NavigateToInvoice(context.Id))">
+                                            View
+                                        </MudButton>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -126,12 +151,16 @@
     public Guid CustomerId { get; set; }
 
     private CustomerDetail? _customer;
+    private List<InvoiceSummary> _customerInvoices = new();
     private bool _isLoading;
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
         _customer = await CustomerDirectory.GetCustomerAsync(CustomerId);
+        _customerInvoices = _customer is null
+            ? new List<InvoiceSummary>()
+            : (await InvoiceWorkspace.GetInvoicesForCustomerAsync(_customer.Id)).ToList();
         _isLoading = false;
     }
 
@@ -148,5 +177,15 @@
     private void NavigateToVehicle(TableRowClickEventArgs<VehicleRecord> args)
     {
         NavigationManager.NavigateTo($"/vehicles/{args.Item.Id}");
+    }
+
+    private void NavigateToInvoice(TableRowClickEventArgs<InvoiceSummary> args)
+    {
+        NavigationManager.NavigateTo($"/invoices/{args.Item.Id}");
+    }
+
+    private void NavigateToInvoice(Guid invoiceId)
+    {
+        NavigationManager.NavigateTo($"/invoices/{invoiceId}");
     }
 }

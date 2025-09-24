@@ -1,0 +1,11 @@
+/* PaymentDialog.razor.css: Reinforces dialog spacing and responsive stacking for payment capture. */
+.crm-payment-dialog .mud-dialog-content {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+}
+
+.crm-payment-dialog-field {
+    width: 100%;
+}
+
+.crm-payment-dialog .mud-button { transition: background-color 150ms ease, color 150ms ease; }

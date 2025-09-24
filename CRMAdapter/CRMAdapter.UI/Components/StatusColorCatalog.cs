@@ -12,7 +12,7 @@ public static class StatusColorCatalog
             "Paid" or "Active" or "Completed" => Color.Success,
             "Processing" or "Scheduled" or "In service" or "In diagnostics" => Color.Info,
             "Draft" or "Awaiting parts" or "In progress" => Color.Warning,
-            "Past due" or "Retired" => Color.Error,
+            "Past due" or "Overdue" or "Retired" => Color.Error,
             _ => Color.Default
         };
     }

@@ -1,0 +1,35 @@
+@* LineItemTable.razor: Reusable grid presenting invoice parts and services with financial clarity. *@
+<MudTable Items="@Items"
+          Dense="true"
+          Hover="true"
+          Breakpoint="Breakpoint.Sm"
+          Class="crm-lineitem-table">
+    <HeaderContent>
+        <MudTh>Part / Service</MudTh>
+        <MudTh>Category</MudTh>
+        <MudTh class="text-right">Qty</MudTh>
+        <MudTh class="text-right">Unit price</MudTh>
+        <MudTh class="text-right">Line total</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Part / Service">
+            <MudText Typo="Typo.subtitle2">@context.Description</MudText>
+        </MudTd>
+        <MudTd DataLabel="Category">@context.Category</MudTd>
+        <MudTd DataLabel="Qty" Class="text-right">@context.Quantity</MudTd>
+        <MudTd DataLabel="Unit price" Class="text-right">@FormatCurrency(context.UnitPrice)</MudTd>
+        <MudTd DataLabel="Line total" Class="text-right">
+            <MudText Typo="Typo.subtitle2">@FormatCurrency(context.LineTotal)</MudText>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<InvoiceLineItem> Items { get; set; } = Array.Empty<InvoiceLineItem>();
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+}
