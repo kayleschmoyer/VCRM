@@ -1,0 +1,154 @@
+@* Detail.razor: Immersive customer 360 with contextual insights and related data workspaces. *@
+@page "/customers/{CustomerId:guid}"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject ICustomerDirectory CustomerDirectory
+@inject NavigationManager NavigationManager
+
+<MudStack Spacing="3" Class="crm-customer-detail">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Justify="Justify.SpaceBetween">
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="NavigateBack"
+                   Color="Color.Default">
+            Back to customers
+        </MudButton>
+        <MudChip Color="Color.Success" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.VerifiedUser" Class="crm-health-chip">
+            Relationship healthy
+        </MudChip>
+    </MudStack>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="0" Class="pa-6">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else if (_customer is null)
+    {
+        <MudPaper Elevation="1" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+            <MudText Typo="Typo.h6">We could not locate that customer</MudText>
+            <MudText Typo="Typo.body2" Class="mud-secondary-text">Select a customer from the directory to continue.</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4" OnClick="NavigateBack">Return to directory</MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem Xs="12" Lg="5">
+                <CustomerCard Name="@_customer.Name"
+                              Email="@_customer.Email"
+                              Phone="@_customer.Phone"
+                              VehicleCount="@_customer.Vehicles.Count"
+                              LastInvoiceDate="@_customer.Invoices.OrderByDescending(i => i.IssuedOn).FirstOrDefault()?.IssuedOn"
+                              Notes="@_customer.Notes">
+                    <MudStack Row="true" Spacing="1" Wrap="true">
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NoteAdd" Color="Color.Primary">
+                            Log touchpoint
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.BuildCircle" Color="Color.Secondary">
+                            Create service case
+                        </MudButton>
+                    </MudStack>
+                </CustomerCard>
+            </MudItem>
+            <MudItem Xs="12" Lg="7">
+                <MudPaper Elevation="1" Class="crm-detail-tabs">
+                    <MudTabs Rounded="true" ApplyEffects="true" KeepPanelsAlive="true">
+                        <MudTabPanel Text="Vehicles" Icon="@Icons.Material.Filled.DirectionsCar">
+                            <MudTable Items="@_customer.Vehicles" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>VIN</MudTh>
+                                    <MudTh>Year</MudTh>
+                                    <MudTh>Model</MudTh>
+                                    <MudTh>Status</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="VIN">@context.Vin</MudTd>
+                                    <MudTd DataLabel="Year">@context.Year</MudTd>
+                                    <MudTd DataLabel="Model">@context.MakeModel</MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <MudChip Color="@ResolveStatusColor(context.Status)" Variant="Variant.Filled" Size="Size.Small">@context.Status</MudChip>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Invoices" Icon="@Icons.Material.Filled.ReceiptLong">
+                            <MudTable Items="@_customer.Invoices" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>Invoice</MudTh>
+                                    <MudTh>Date</MudTh>
+                                    <MudTh>Amount</MudTh>
+                                    <MudTh>Status</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Invoice">@context.InvoiceNumber</MudTd>
+                                    <MudTd DataLabel="Date">@context.IssuedOn.ToString("MMM dd, yyyy")</MudTd>
+                                    <MudTd DataLabel="Amount">@FormatCurrency(context.Amount)</MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <MudChip Color="@ResolveStatusColor(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Appointments" Icon="@Icons.Material.Filled.EventAvailable">
+                            <MudTable Items="@_customer.Appointments" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>When</MudTh>
+                                    <MudTh>Subject</MudTh>
+                                    <MudTh>Owner</MudTh>
+                                    <MudTh>Status</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="When">@context.ScheduledFor.ToLocalTime().ToString("MMM dd, yyyy h:mm tt")</MudTd>
+                                    <MudTd DataLabel="Subject">@context.Subject</MudTd>
+                                    <MudTd DataLabel="Owner">@context.Owner</MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <MudChip Color="@ResolveStatusColor(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudTabPanel>
+                    </MudTabs>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public Guid CustomerId { get; set; }
+
+    private CustomerDetail? _customer;
+    private bool _isLoading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _customer = await CustomerDirectory.GetCustomerAsync(CustomerId);
+        _isLoading = false;
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/customers");
+    }
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+
+    private static Color ResolveStatusColor(string status)
+    {
+        return status switch
+        {
+            "Paid" or "Active" or "Completed" => Color.Success,
+            "Processing" or "Scheduled" or "In service" => Color.Info,
+            "Draft" or "Awaiting parts" or "In diagnostics" => Color.Warning,
+            "Past due" or "Retired" => Color.Error,
+            _ => Color.Default
+        };
+    }
+}

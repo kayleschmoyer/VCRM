@@ -4,6 +4,7 @@ using CRMAdapter.UI.Auth;
 using CRMAdapter.UI.Hosting;
 using CRMAdapter.UI.Infrastructure.Security;
 using CRMAdapter.UI.Navigation;
+using CRMAdapter.UI.Services.Customers;
 using CRMAdapter.UI.Services.Diagnostics;
 using CRMAdapter.UI.Theming;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -70,6 +71,7 @@ builder.Services.AddScoped<JwtAuthProvider>();
 builder.Services.AddSingleton<NavigationMenuService>();
 builder.Services.AddScoped<AppThemeState>();
 builder.Services.AddScoped<CorrelationContext>();
+builder.Services.AddSingleton<ICustomerDirectory, InMemoryCustomerDirectory>();
 
 builder.Services.AddHttpClient(HttpClientNames.CrmApi, client =>
     {

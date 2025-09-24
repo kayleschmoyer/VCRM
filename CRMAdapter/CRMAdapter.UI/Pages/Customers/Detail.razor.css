@@ -1,0 +1,41 @@
+/* Detail.razor.css: Styles the responsive customer detail 360 workspace. */
+.crm-customer-detail {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.crm-health-chip {
+    font-weight: 600;
+}
+
+.crm-detail-tabs {
+    border-radius: 20px;
+    padding: 1.5rem;
+}
+
+.crm-detail-tabs .mud-tabs-toolbar {
+    margin-bottom: 1rem;
+}
+
+.crm-detail-tabs .mud-tab-panel {
+    padding: 0;
+}
+
+.crm-detail-tabs .mud-table {
+    border-radius: 12px;
+}
+
+.crm-detail-tabs .mud-table tr:hover {
+    background-color: rgba(54, 97, 255, 0.06);
+}
+
+@media (max-width: 959.95px) {
+    .crm-customer-detail {
+        padding-inline: 1rem;
+    }
+
+    .crm-detail-tabs {
+        padding: 1rem;
+    }
+}

@@ -1,0 +1,39 @@
+/* CustomerSearchBar.razor.css: Styles the debounced search field with responsive affordances. */
+.crm-customer-search {
+    width: 100%;
+}
+
+.crm-customer-search-input {
+    flex: 1;
+    min-width: 0;
+    transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.crm-customer-search-input .mud-input-input {
+    font-size: 0.95rem;
+}
+
+.crm-customer-search-input:hover,
+.crm-customer-search-input:focus-within {
+    box-shadow: 0 8px 24px rgba(54, 97, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.crm-customer-search-clear {
+    transition: transform 150ms ease;
+}
+
+.crm-customer-search-clear:hover {
+    transform: scale(1.05);
+}
+
+@media (max-width: 599.95px) {
+    .crm-customer-search {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .crm-customer-search-clear {
+        margin-left: auto;
+    }
+}

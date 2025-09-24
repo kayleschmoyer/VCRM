@@ -14,6 +14,7 @@ public sealed class NavigationMenuService
     private static readonly IReadOnlyList<NavigationLink> Links = new List<NavigationLink>
     {
         new("Command Center", Icons.Material.Filled.DashboardCustomize, "/", "Executive overview with actionable KPIs.", RolePolicies.AllRoles),
+        new("Customers", Icons.Material.Filled.PeopleAlt, "/customers", "360° customer directory and relationship insights.", RolePolicies.AllRoles),
         new("Operations", Icons.Material.Filled.PrecisionManufacturing, "/operations", "Order orchestration and fulfillment visibility.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
         new("Field Service", Icons.Material.Filled.HomeRepairService, "/field-service", "Technician dispatching and status intelligence.", new[] { RolePolicies.Tech, RolePolicies.Manager }),
         new("Data Stewardship", Icons.Material.Filled.Storage, "/data-quality", "Data quality dashboards and stewardship workflows.", new[] { RolePolicies.Admin, RolePolicies.Manager }),

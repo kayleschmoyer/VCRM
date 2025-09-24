@@ -1,0 +1,17 @@
+/* ActionButtons.razor.css: Provides hover motion and alignment for action clusters. */
+.crm-action-buttons {
+    justify-content: flex-end;
+}
+
+.crm-action-buttons .mud-icon-button {
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.crm-action-buttons .mud-icon-button:not(.mud-disabled):hover {
+    transform: translateY(-1px) scale(1.05);
+    box-shadow: 0 6px 18px rgba(54, 97, 255, 0.18);
+}
+
+.crm-action-buttons .mud-disabled {
+    opacity: 0.45;
+}
