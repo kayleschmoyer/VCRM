@@ -1,0 +1,102 @@
+name: CRM Adapter CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore CRMAdapter/CRMAdapter.sln
+
+      - name: Build
+        run: dotnet build CRMAdapter/CRMAdapter.sln --configuration Release --no-restore
+
+      - name: Secret Scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config: CRMAdapter/Tests/SecurityTests/Secrets_Gitleaks.toml
+          fail: true
+
+      - name: Create artifact directories
+        run: |
+          mkdir -p CRMAdapter/Artifacts/TestResults
+          mkdir -p CRMAdapter/Artifacts/Coverage
+
+      - name: Test with coverage
+        run: |
+          dotnet test CRMAdapter/CRMAdapter.sln \
+            --configuration Release \
+            --no-build \
+            --results-directory CRMAdapter/Artifacts/TestResults \
+            --logger "trx;LogFileName=TestResults.trx" \
+            --logger "junit;LogFileName=TestResults.xml" \
+            --collect:"XPlat Code Coverage"
+
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage reports
+        env:
+          PATH: $HOME/.dotnet/tools:${{ env.PATH }}
+        run: |
+          reportgenerator \
+            "-reports:CRMAdapter/Artifacts/TestResults/**/*.cobertura.xml" \
+            "-targetdir:CRMAdapter/Artifacts/Coverage" \
+            "-reporttypes:Html;MarkdownSummaryGithub"
+
+      - name: Publish Markdown summary
+        if: always()
+        run: |
+          if [ -f CRMAdapter/Artifacts/Coverage/SummaryGithub.md ]; then
+            echo "### Test & Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            cat CRMAdapter/Artifacts/Coverage/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            CRMAdapter/Artifacts/TestResults
+            CRMAdapter/Artifacts/Coverage
+
+  load-test:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run customer list load test
+        run: |
+          docker run --rm -v "${{ github.workspace }}/CRMAdapter/Tests/LoadTests/k6:/scripts" grafana/k6 \
+            run /scripts/customer-list-load.test.js --vus 10 --duration 1m --out json=/scripts/customer-load.json
+
+      - name: Run invoice search spike test
+        run: |
+          docker run --rm -v "${{ github.workspace }}/CRMAdapter/Tests/LoadTests/k6:/scripts" grafana/k6 \
+            run /scripts/invoice-search-spike.test.js --out json=/scripts/invoice-spike.json
+
+      - name: Upload load artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results
+          path: CRMAdapter/Tests/LoadTests/k6/*.json

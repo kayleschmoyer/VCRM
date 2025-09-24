@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>CRMAdapter.Tests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CRMAdapter.Core/CRMAdapter.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="UnitTests/**/*.cs" />
+    <Compile Include="IntegrationTests/**/*.cs" />
+    <Compile Include="EndToEndTests/**/*.cs" />
+    <Compile Include="SmokeTests/**/*.cs" />
+    <Compile Include="PerformanceTests/**/*.cs" />
+    <Compile Include="SecurityTests/**/*.cs" />
+    <Compile Include="ChaosTests/**/*.cs" />
+    <Compile Include="TestUtilities/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="TestUtilities/Fixtures/SeedScripts/**/*.sql" />
+    <EmbeddedResource Include="TestUtilities/Fixtures/Resources/**/*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
+    <PackageReference Include="Bogus" Version="35.4.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="Gitleaks" Version="8.18.2" PrivateAssets="all" Condition="'0' == '1'" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="Moq" Version="4.20.70" />
+    <PackageReference Include="Polly" Version="8.4.0" />
+    <PackageReference Include="Polly.Contrib.Simmy" Version="0.3.0" />
+    <PackageReference Include="Respawn" Version="6.2.1" />
+    <PackageReference Include="SharpFuzz" Version="2.0.1" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.5" Condition="'0' == '1'" />
+    <PackageReference Include="xunit" Version="2.8.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="DotNet.Testcontainers" Version="1.6.0" />
+    <PackageReference Include="JunitXml.TestLogger" Version="3.0.134" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="SecurityTests/Secrets_Gitleaks.toml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SecurityTests/SAST_SonarQube_Config.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SecurityTests/SCA_DependencyCheck.gradle-or-config.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SecurityTests/OwaspZap_BlazorBaseline.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="MutationTests/Mutation_ReadMe.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="LoadTests/k6/*.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

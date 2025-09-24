@@ -152,7 +152,7 @@ namespace CRMAdapter.VastOnline.Adapter
             var sanitizedQuery = SanitizeNameQuery(nameQuery);
             var limit = EnforceLimit(maxResults, _defaultSearchLimit, nameof(maxResults));
 
-            return ExecuteDbOperationAsync(
+            return ExecuteDbOperationAsync<IReadOnlyCollection<Customer>>(
                 "CustomerAdapter.SearchByName",
                 async ct =>
                 {
@@ -172,7 +172,7 @@ ORDER BY {fieldMap["Name"]};";
                     var vehicleLookup = await LoadVehicleReferencesAsync(snapshots.Select(s => s.Id), ct)
                         .ConfigureAwait(false);
 
-                    return new ReadOnlyCollection<Customer>(snapshots
+                    return (IReadOnlyCollection<Customer>)new ReadOnlyCollection<Customer>(snapshots
                         .Select(snapshot =>
                         {
                             var vehicles = vehicleLookup.TryGetValue(snapshot.Id, out var list)
@@ -192,7 +192,7 @@ ORDER BY {fieldMap["Name"]};";
         {
             var limit = EnforceLimit(maxResults, _defaultListLimit, nameof(maxResults));
 
-            return ExecuteDbOperationAsync(
+            return ExecuteDbOperationAsync<IReadOnlyCollection<Customer>>(
                 "CustomerAdapter.GetRecent",
                 async ct =>
                 {
@@ -211,7 +211,7 @@ ORDER BY {modifiedOnField} DESC;";
                     var vehicleLookup = await LoadVehicleReferencesAsync(snapshots.Select(s => s.Id), ct)
                         .ConfigureAwait(false);
 
-                    return new ReadOnlyCollection<Customer>(snapshots
+                    return (IReadOnlyCollection<Customer>)new ReadOnlyCollection<Customer>(snapshots
                         .Select(snapshot =>
                         {
                             var vehicles = vehicleLookup.TryGetValue(snapshot.Id, out var list)
