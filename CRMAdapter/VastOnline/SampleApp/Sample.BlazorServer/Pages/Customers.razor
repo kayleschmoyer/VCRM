@@ -1,0 +1,52 @@
+@*-----------------------------------------------------------------------
+ File: Customers.razor
+ Role: Demonstrates consuming the Vast Online customer adapter within a Blazor component.
+ Architectural Purpose: Showcases dependency injection and async data binding against the canonical CRM domain.
+-----------------------------------------------------------------------*@
+@page "/customers"
+@using CRMAdapter.CommonContracts
+@using CRMAdapter.CommonDomain
+@inject ICustomerAdapter CustomerAdapter
+
+<h3>Recent Customers</h3>
+
+@if (_customers is null)
+{
+    <p><em>Loading customers...</em></p>
+}
+else if (_customers.Count == 0)
+{
+    <p>No customers were returned from the adapter.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var customer in _customers)
+            {
+                <tr>
+                    <td>@customer.DisplayName</td>
+                    <td>@customer.Email</td>
+                    <td>@customer.PrimaryPhone</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyCollection<Customer>? _customers;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await CustomerAdapter.GetRecentCustomersAsync(25);
+    }
+}
