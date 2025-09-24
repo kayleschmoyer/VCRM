@@ -1,0 +1,180 @@
+@* List.razor: Command view for searching, filtering, and managing the appointments backlog. *@
+@page "/appointments"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject IAppointmentBook AppointmentBook
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="3" Class="crm-appointments-page">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudStack Spacing="0.5">
+            <MudText Typo="Typo.h4">Appointments</MudText>
+            <MudText Typo="Typo.body2" Class="mud-secondary-text">Book, monitor, and adjust technician schedules in real time.</MudText>
+        </MudStack>
+        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.CalendarViewWeek"
+                       Color="Color.Secondary"
+                       OnClick="NavigateToSchedule">
+                Open schedule view
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Disabled="true">
+                New appointment
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <MudPaper Elevation="1" Class="crm-appointments-filter">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="true">
+            <MudDateRangePicker Label="Date range"
+                                Value="@_dateRange"
+                                ValueChanged="OnDateRangeChanged"
+                                PickerActions="true"
+                                CloseOnSelection="false"
+                                DisableToolbar="true"
+                                MaxValue="@DateTime.UtcNow.AddMonths(6).Date" />
+            <MudSelect T="string" Label="Status" Value="@_statusFilter" ValueChanged="OnStatusChanged" Clearable="true">
+                @foreach (var status in _statuses)
+                {
+                    <MudSelectItem Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="RefreshAsync"
+                       Disabled="@_isLoading">
+                Refresh
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="0" Class="pa-6 text-center">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else if (_appointments.Count == 0)
+    {
+        <MudPaper Elevation="0" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.EventBusy" Color="Color.Secondary" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.subtitle1">No appointments match your filters</MudText>
+            <MudText Typo="Typo.caption" Class="mud-secondary-text">Adjust filters or book a new appointment to see it here.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Elevation="1" Class="crm-appointments-table">
+            <MudTable Items="@_appointments" Dense="false" Hover="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Date / Time</MudTh>
+                    <MudTh>Customer</MudTh>
+                    <MudTh>Vehicle</MudTh>
+                    <MudTh>Service</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Technician</MudTh>
+                    <MudTh class="text-right">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Date / Time">
+                        <MudStack Spacing="0.25">
+                            <MudText Typo="Typo.subtitle2">@context.ScheduledStart.ToLocalTime().ToString("MMM dd, yyyy")</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">@context.ScheduledStart.ToLocalTime().ToString("h:mm tt") – @context.ScheduledEnd.ToLocalTime().ToString("h:mm tt")</MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Customer">
+                        <MudLink Href="@($"/customers/{context.Customer.Id}")">@context.Customer.Name</MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Vehicle">
+                        <MudLink Href="@($"/vehicles/{context.Vehicle.Id}")">@context.Vehicle.DisplayName</MudLink>
+                        <MudText Typo="Typo.caption" Class="mud-secondary-text">VIN @context.Vehicle.Vin</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Service">@context.Service</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Technician">@context.Technician</MudTd>
+                    <MudTd DataLabel="Actions" Class="text-right">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => NavigateToDetail(context.Id))">View</MudButton>
+                        <MudMenu AnchorOrigin="Origin.TopRight" TransformOrigin="Origin.TopRight">
+                            <ActivatorContent>
+                                <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Default" />
+                            </ActivatorContent>
+                            <MudMenuItem Disabled="true">Reschedule (coming soon)</MudMenuItem>
+                            <MudMenuItem Disabled="true">Cancel (coming soon)</MudMenuItem>
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+</MudStack>
+
+@code {
+    private readonly List<AppointmentSummary> _appointments = new();
+    private IReadOnlyList<string> _statuses = Array.Empty<string>();
+    private DateRange? _dateRange;
+    private string? _statusFilter;
+    private bool _isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        _statuses = await AppointmentBook.GetStatusesAsync();
+        await LoadAppointmentsAsync();
+        _isLoading = false;
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        DateTime? start = null;
+        DateTime? end = null;
+        if (_dateRange?.Start is not null)
+        {
+            start = DateTime.SpecifyKind(_dateRange.Start.Value, DateTimeKind.Local).ToUniversalTime();
+        }
+
+        if (_dateRange?.End is not null)
+        {
+            end = DateTime.SpecifyKind(_dateRange.End.Value, DateTimeKind.Local).ToUniversalTime().AddDays(1).AddTicks(-1);
+        }
+
+        var results = await AppointmentBook.GetAppointmentsAsync(start, end, _statusFilter);
+        _appointments.Clear();
+        _appointments.AddRange(results);
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private Task OnDateRangeChanged(DateRange? range)
+    {
+        _dateRange = range;
+        return LoadAppointmentsAsync();
+    }
+
+    private Task OnStatusChanged(string? status)
+    {
+        _statusFilter = status;
+        return LoadAppointmentsAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        Snackbar.Add("Appointments refreshed", Severity.Success, options => options.RequireInteraction = false);
+        await LoadAppointmentsAsync();
+    }
+
+    private void NavigateToDetail(Guid appointmentId)
+    {
+        NavigationManager.NavigateTo($"/appointments/{appointmentId}");
+    }
+
+    private void NavigateToSchedule()
+    {
+        NavigationManager.NavigateTo("/appointments/schedule");
+    }
+}

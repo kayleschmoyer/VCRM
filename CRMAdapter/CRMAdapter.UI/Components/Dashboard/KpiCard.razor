@@ -1,0 +1,101 @@
+@* KpiCard.razor: Animated KPI tile combining iconography, metric value, and context summary. *@
+@implements IDisposable
+
+<MudPaper Elevation="1" Class="crm-kpi-card">
+    <MudStack Row="true" Spacing="1.5" AlignItems="AlignItems.Center">
+        <MudAvatar Icon="@Icon" Color="@IconColor" Variant="Variant.Filled" Size="Size.Large" />
+        <MudStack Spacing="0.5">
+            <MudText Typo="Typo.overline" Class="mud-secondary-text">@Label</MudText>
+            <MudText Typo="Typo.h4" Class="crm-kpi-value">@FormatValue(_displayValue)</MudText>
+            @if (!string.IsNullOrWhiteSpace(Subtext))
+            {
+                <MudText Typo="Typo.caption" Class="mud-secondary-text">@Subtext</MudText>
+            }
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public double Value { get; set; }
+
+    [Parameter]
+    public string Icon { get; set; } = Icons.Material.Filled.Insights;
+
+    [Parameter]
+    public string? Subtext { get; set; }
+
+    [Parameter]
+    public Color IconColor { get; set; } = Color.Primary;
+
+    [Parameter]
+    public string ValueFormat { get; set; } = "N0";
+
+    private double _displayValue;
+    private CancellationTokenSource? _animationCts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await AnimateToValueAsync(Value);
+    }
+
+    private async Task AnimateToValueAsync(double target)
+    {
+        _animationCts?.Cancel();
+        _animationCts = new CancellationTokenSource();
+        var token = _animationCts.Token;
+
+        var initial = _displayValue;
+        var delta = target - initial;
+        var duration = TimeSpan.FromMilliseconds(700);
+        var steps = 28;
+        if (Math.Abs(delta) < 0.001)
+        {
+            _displayValue = target;
+            StateHasChanged();
+            return;
+        }
+
+        for (var i = 1; i <= steps; i++)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var progress = (double)i / steps;
+            _displayValue = initial + delta * EaseOut(progress);
+            StateHasChanged();
+            try
+            {
+                await Task.Delay(duration / steps, token);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+        }
+
+        _displayValue = target;
+        StateHasChanged();
+    }
+
+    private string FormatValue(double value)
+    {
+        return value.ToString(ValueFormat, System.Globalization.CultureInfo.CurrentCulture);
+    }
+
+    private static double EaseOut(double progress)
+    {
+        return 1 - Math.Pow(1 - progress, 3);
+    }
+
+    public void Dispose()
+    {
+        _animationCts?.Cancel();
+        _animationCts?.Dispose();
+    }
+}

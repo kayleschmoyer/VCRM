@@ -1,0 +1,22 @@
+/* List.razor.css: Establishes layout, spacing, and responsive polish for the appointments list. */
+.crm-appointments-page {
+    padding-bottom: 2rem;
+}
+
+.crm-appointments-filter {
+    padding: 1.25rem;
+    border-radius: 16px;
+}
+
+.crm-appointments-table {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.crm-appointments-table .mud-table-cell {
+    vertical-align: middle;
+}
+
+.crm-appointments-table .mud-chip {
+    font-weight: 600;
+}

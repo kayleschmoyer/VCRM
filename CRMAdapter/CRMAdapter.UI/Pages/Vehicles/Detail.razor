@@ -111,7 +111,9 @@
                             <HistoryTable Items="@AppointmentEntries"
                                           PrimaryLabel="When"
                                           SecondaryLabel="Subject"
-                                          TertiaryLabel="Owner" />
+                                          TertiaryLabel="Owner"
+                                          EnableSelection="true"
+                                          OnEntrySelected="NavigateToAppointment" />
                         </MudTabPanel>
                     </MudTabs>
                 </MudPaper>
@@ -136,7 +138,8 @@
             appointment.Owner,
             null,
             appointment.Status,
-            StatusColorCatalog.Resolve(appointment.Status)))
+            StatusColorCatalog.Resolve(appointment.Status),
+            appointment.Id))
         .ToList() ?? Array.Empty<HistoryEntry>();
 
     protected override async Task OnParametersSetAsync()
@@ -167,6 +170,14 @@
     private void NavigateToInvoice(Guid invoiceId)
     {
         NavigationManager.NavigateTo($"/invoices/{invoiceId}");
+    }
+
+    private void NavigateToAppointment(HistoryEntry entry)
+    {
+        if (entry.ReferenceId.HasValue)
+        {
+            NavigationManager.NavigateTo($"/appointments/{entry.ReferenceId.Value}");
+        }
     }
 
     private static string FormatCurrency(decimal amount)

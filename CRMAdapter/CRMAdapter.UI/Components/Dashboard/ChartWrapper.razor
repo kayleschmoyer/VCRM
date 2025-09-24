@@ -1,0 +1,41 @@
+@* ChartWrapper.razor: Applies consistent chrome and transitions around MudBlazor charts. *@
+<MudPaper Elevation="1" Class="crm-chart-card">
+    <MudStack Spacing="1.5">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Spacing="0.25">
+                <MudText Typo="Typo.subtitle1">@Title</MudText>
+                @if (!string.IsNullOrWhiteSpace(Subtitle))
+                {
+                    <MudText Typo="Typo.caption" Class="mud-secondary-text">@Subtitle</MudText>
+                }
+            </MudStack>
+            @if (ActionContent is not null)
+            {
+                <MudStack>
+                    @ActionContent
+                </MudStack>
+            }
+        </MudStack>
+        <MudChart Class="crm-chart" ChartType="@ChartType" XAxisLabels="@Labels" ChartSeries="@Series" AnimationDuration="700" />
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public ChartType ChartType { get; set; } = ChartType.Bar;
+
+    [Parameter]
+    public IReadOnlyList<string> Labels { get; set; } = Array.Empty<string>();
+
+    [Parameter]
+    public IReadOnlyList<ChartSeries> Series { get; set; } = Array.Empty<ChartSeries>();
+
+    [Parameter]
+    public RenderFragment? ActionContent { get; set; }
+}

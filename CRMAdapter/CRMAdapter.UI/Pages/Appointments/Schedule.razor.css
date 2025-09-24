@@ -1,0 +1,51 @@
+/* Schedule.razor.css: Crafts a responsive, calendar-like grid for the weekly appointment view. */
+.crm-appointments-schedule {
+    padding-bottom: 2rem;
+}
+
+.crm-schedule-controls {
+    padding: 1rem 1.5rem;
+    border-radius: 18px;
+}
+
+.crm-schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+
+.crm-schedule-day {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 18px;
+    padding: 1rem;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+body.mud-theme-dark .crm-schedule-day {
+    background: rgba(30, 41, 59, 0.7);
+    border-color: rgba(148, 163, 184, 0.25);
+}
+
+.crm-schedule-day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.crm-schedule-empty {
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: 1px dashed rgba(148, 163, 184, 0.35);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 960px) {
+    .crm-schedule-grid {
+        grid-template-columns: 1fr;
+    }
+}

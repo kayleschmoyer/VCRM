@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CRMAdapter.UI.Services.Appointments;
 using CRMAdapter.UI.Services.Vehicles.Models;
 
 namespace CRMAdapter.UI.Services.Vehicles;
@@ -48,6 +49,15 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
 
     private static IReadOnlyList<VehicleDetail> SeedVehicles()
     {
+        var appointmentsByVehicle = AppointmentSeedData.Records
+            .GroupBy(record => record.VehicleId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(r => r.ScheduledStart)
+                    .Select(r => new VehicleAppointmentRecord(r.Id, r.ScheduledStart, r.Service, r.Technician, r.Status))
+                    .ToList());
+
         return new List<VehicleDetail>
         {
             new(
@@ -67,11 +77,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-1010", CreateDate(2024, 8, 22), 17250.00m, "Paid"),
                     new("INV-0975", CreateDate(2024, 5, 30), 18940.00m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 12, 6, 9, 30), "Thermal system calibration", "Jordan Blake", "Scheduled"),
-                    new(CreateDate(2024, 10, 10, 13, 0), "Firmware patch rollout", "Priya Patel", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("2b66a1f2-2b34-4a94-b2b3-9c7ae2d0d4fa"), out var f150Appointments)
+                    ? f150Appointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("7f1ec5f0-273a-4b02-a5e3-04f5bcd00b6a"),
@@ -89,11 +97,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-1021", CreateDate(2024, 9, 2), 18740.50m, "Paid"),
                     new("INV-0988", CreateDate(2024, 6, 14), 16330.00m, "Processing")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 11, 28, 8, 0), "HVAC diagnostics", "Leo Zhang", "In service"),
-                    new(CreateDate(2024, 9, 18, 11, 30), "Torque calibration", "Mia Chen", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("7f1ec5f0-273a-4b02-a5e3-04f5bcd00b6a"), out var silveradoAppointments)
+                    ? silveradoAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("56d7b2d4-8b38-49be-bd23-1b4dc191f70e"),
@@ -111,11 +117,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-0998", CreateDate(2024, 6, 27), 22110.75m, "Past due"),
                     new("INV-0951", CreateDate(2024, 3, 5), 15480.25m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 12, 12, 15, 15), "Battery wellness clinic", "Avery Ross", "Scheduled"),
-                    new(CreateDate(2024, 7, 21, 10, 45), "Range optimization", "Jordan Blake", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("56d7b2d4-8b38-49be-bd23-1b4dc191f70e"), out var leafAppointments)
+                    ? leafAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("f7b1b822-75c7-4f89-8f0f-82c4309a5ba0"),
@@ -133,11 +137,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-2087", CreateDate(2024, 10, 29), 9450.00m, "Processing"),
                     new("INV-2043", CreateDate(2024, 8, 15), 11220.00m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 12, 3, 9, 0), "Autopilot calibration", "Priya Patel", "Scheduled"),
-                    new(CreateDate(2024, 9, 9, 14, 0), "Luxury detailing", "Leo Zhang", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("f7b1b822-75c7-4f89-8f0f-82c4309a5ba0"), out var modelSAppointments)
+                    ? modelSAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("b058c752-2693-40ed-9be4-54d13fd88019"),
@@ -155,11 +157,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-2001", CreateDate(2024, 5, 3), 6580.00m, "Paid"),
                     new("INV-1960", CreateDate(2024, 2, 12), 4875.00m, "Draft")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 11, 21, 9, 0), "Drive unit swap", "Priya Patel", "Awaiting parts"),
-                    new(CreateDate(2024, 8, 5, 10, 0), "Cooling system check", "Avery Ross", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("b058c752-2693-40ed-9be4-54d13fd88019"), out var ramAppointments)
+                    ? ramAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("17fe4cbb-08f1-4a4e-bc26-5aba25ad607c"),
@@ -177,11 +177,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-3104", CreateDate(2024, 12, 1), 40250.00m, "Draft"),
                     new("INV-3059", CreateDate(2024, 9, 19), 38990.00m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 12, 15, 13, 0), "Pilot launch readiness", "Jordan Blake", "Scheduled"),
-                    new(CreateDate(2024, 11, 2, 15, 30), "ADAS analytics review", "Nora Alvarez", "Scheduled")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("17fe4cbb-08f1-4a4e-bc26-5aba25ad607c"), out var ixAppointments)
+                    ? ixAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("f44f6c61-18a7-4b09-9c10-1c7c79855a34"),
@@ -199,11 +197,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-2995", CreateDate(2024, 7, 23), 41575.00m, "Paid"),
                     new("INV-2940", CreateDate(2024, 4, 11), 36840.00m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 11, 22, 16, 0), "Sensor recalibration", "Isabella Moore", "In diagnostics"),
-                    new(CreateDate(2024, 9, 14, 9, 30), "Thermal imaging tune", "Jordan Blake", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("f44f6c61-18a7-4b09-9c10-1c7c79855a34"), out var insightAppointments)
+                    ? insightAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("2b331d6c-7fb2-4a42-955a-01f8a0fa7a62"),
@@ -221,11 +217,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                     new("INV-3059", CreateDate(2024, 9, 19), 38990.00m, "Paid"),
                     new("INV-2882", CreateDate(2024, 3, 28), 27410.00m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 12, 9, 11, 0), "Accessibility retrofit QA", "Jordan Blake", "Scheduled"),
-                    new(CreateDate(2024, 8, 28, 10, 0), "Safety certification retro", "Isabella Moore", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("2b331d6c-7fb2-4a42-955a-01f8a0fa7a62"), out var pacificaAppointments)
+                    ? pacificaAppointments
+                    : new List<VehicleAppointmentRecord>()
             ),
             new(
                 Guid.Parse("73a1f2fe-6475-4b47-8178-3bfe5d9dd26a"),
@@ -242,10 +236,9 @@ public sealed class InMemoryVehicleRegistry : IVehicleRegistry
                 {
                     new("INV-2766", CreateDate(2024, 1, 17), 19800.00m, "Paid")
                 },
-                new List<VehicleAppointmentRecord>
-                {
-                    new(CreateDate(2024, 7, 5, 8, 30), "Decommission inspection", "Jordan Blake", "Completed")
-                }
+                appointmentsByVehicle.TryGetValue(Guid.Parse("73a1f2fe-6475-4b47-8178-3bfe5d9dd26a"), out var accordAppointments)
+                    ? accordAppointments
+                    : new List<VehicleAppointmentRecord>()
             )
         };
     }

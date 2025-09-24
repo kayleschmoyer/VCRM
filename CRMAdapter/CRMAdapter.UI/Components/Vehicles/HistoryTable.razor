@@ -1,5 +1,10 @@
 @* HistoryTable.razor: Generic timeline table for invoices, appointments, and other vehicle history streams. *@
-<MudTable Items="@Items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm" Class="crm-history-table">
+<MudTable Items="@Items"
+          Dense="true"
+          Hover="true"
+          Breakpoint="Breakpoint.Sm"
+          Class="@GetTableClass()"
+          OnRowClick="HandleRowClick">
     <HeaderContent>
         <MudTh>@PrimaryLabel</MudTh>
         <MudTh>@SecondaryLabel</MudTh>
@@ -50,5 +55,26 @@
     [Parameter]
     public IReadOnlyList<HistoryEntry> Items { get; set; } = Array.Empty<HistoryEntry>();
 
+    [Parameter]
+    public bool EnableSelection { get; set; }
+
+    [Parameter]
+    public EventCallback<HistoryEntry> OnEntrySelected { get; set; }
+
     private bool ShowQuaternary => !string.IsNullOrWhiteSpace(QuaternaryLabel);
+
+    private string GetTableClass()
+    {
+        return EnableSelection ? "crm-history-table crm-history-selectable" : "crm-history-table";
+    }
+
+    private async Task HandleRowClick(TableRowClickEventArgs<HistoryEntry> args)
+    {
+        if (!EnableSelection || !OnEntrySelected.HasDelegate)
+        {
+            return;
+        }
+
+        await OnEntrySelected.InvokeAsync(args.Item);
+    }
 }
