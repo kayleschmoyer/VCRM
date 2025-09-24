@@ -1,0 +1,77 @@
+@* CustomerSearchBar.razor: Debounced search field that emits customer directory queries for instant filtering. *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="crm-customer-search">
+    <MudTextField @bind-Value="_query"
+                  Variant="Variant.Outlined"
+                  Placeholder="@Placeholder"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true"
+                  DebounceInterval="@DebounceInterval"
+                  OnDebouncedValueChanged="HandleDebouncedValueChanged"
+                  OnKeyDown="HandleKeyDown"
+                  Class="crm-customer-search-input"
+                  aria-label="Search customers" />
+    @if (!string.IsNullOrWhiteSpace(_query))
+    {
+        <MudTooltip Text="Clear search">
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Color="Color.Default"
+                           Class="crm-customer-search-clear"
+                           aria-label="Clear search"
+                           OnClick="ClearAsync" />
+        </MudTooltip>
+    }
+</MudStack>
+
+@code {
+    private string _query = string.Empty;
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Search customers";
+
+    [Parameter]
+    public int DebounceInterval { get; set; } = 250;
+
+    [Parameter]
+    public EventCallback<string> OnSearch { get; set; }
+
+    [Parameter]
+    public EventCallback OnCleared { get; set; }
+
+    private async Task HandleDebouncedValueChanged(string value)
+    {
+        _query = value;
+        if (OnSearch.HasDelegate)
+        {
+            await OnSearch.InvokeAsync(value);
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            if (OnSearch.HasDelegate)
+            {
+                await OnSearch.InvokeAsync(_query);
+            }
+        }
+        else if (args.Key == "Escape")
+        {
+            await ClearAsync();
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        _query = string.Empty;
+        if (OnCleared.HasDelegate)
+        {
+            await OnCleared.InvokeAsync();
+        }
+        else if (OnSearch.HasDelegate)
+        {
+            await OnSearch.InvokeAsync(string.Empty);
+        }
+    }
+}

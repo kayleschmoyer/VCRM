@@ -1,0 +1,39 @@
+/* CustomerCard.razor.css: Applies luxurious styling to the reusable customer summary card. */
+.crm-customer-card {
+    border-radius: 18px;
+    transition: transform 160ms ease, box-shadow 200ms ease;
+}
+
+.crm-customer-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+}
+
+.crm-customer-card-avatar {
+    font-weight: 600;
+}
+
+.crm-customer-card-name {
+    letter-spacing: -0.01em;
+}
+
+.crm-customer-card-meta .mud-icon {
+    color: rgba(100, 116, 139, 0.85);
+}
+
+.crm-customer-card-chip {
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+.crm-customer-card-notes {
+    background: linear-gradient(135deg, rgba(54, 97, 255, 0.08), rgba(228, 80, 160, 0.08));
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+}
+
+@media (max-width: 599.95px) {
+    .crm-customer-card {
+        border-radius: 16px;
+    }
+}

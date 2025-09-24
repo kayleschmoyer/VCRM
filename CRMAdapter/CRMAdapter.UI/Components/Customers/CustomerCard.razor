@@ -1,0 +1,106 @@
+@* CustomerCard.razor: Premium summary card for quickly scanning customer identity and health signals. *@
+<MudCard Class="crm-customer-card" Elevation="1">
+    <MudCardContent>
+        <MudStack Spacing="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1.5">
+                <MudAvatar Size="Size.Large"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Class="crm-customer-card-avatar">
+                    @Initials
+                </MudAvatar>
+                <MudStack Spacing="0.5">
+                    <MudText Typo="Typo.h6" Class="crm-customer-card-name">@Name</MudText>
+                    @if (!string.IsNullOrWhiteSpace(Email))
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0.5" Class="crm-customer-card-meta">
+                            <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />
+                            <MudText Typo="Typo.caption">@Email</MudText>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Phone))
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0.5" Class="crm-customer-card-meta">
+                            <MudIcon Icon="@Icons.Material.Filled.Call" Size="Size.Small" />
+                            <MudText Typo="Typo.caption">@Phone</MudText>
+                        </MudStack>
+                    }
+                </MudStack>
+            </MudStack>
+
+            <MudStack Row="true" Spacing="1" Wrap="true">
+                <MudChip Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small" Class="crm-customer-card-chip">
+                    <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Size="Size.Small" Class="me-1" />
+                    @VehicleCount vehicles
+                </MudChip>
+                <MudChip Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small" Class="crm-customer-card-chip">
+                    <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="me-1" />
+                    Last invoice @FormatLastInvoiceDate(LastInvoiceDate)
+                </MudChip>
+            </MudStack>
+
+            @if (!string.IsNullOrWhiteSpace(Notes))
+            {
+                <MudPaper Elevation="0" Class="crm-customer-card-notes">
+                    <MudText Typo="Typo.overline" Class="mb-1">Account narrative</MudText>
+                    <MudText Typo="Typo.body2">@Notes</MudText>
+                </MudPaper>
+            }
+
+            @if (ChildContent is not null)
+            {
+                <MudDivider />
+                <MudStack Spacing="1">
+                    @ChildContent
+                </MudStack>
+            }
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Email { get; set; }
+
+    [Parameter]
+    public string? Phone { get; set; }
+
+    [Parameter]
+    public int VehicleCount { get; set; }
+
+    [Parameter]
+    public DateTime? LastInvoiceDate { get; set; }
+
+    [Parameter]
+    public string? Notes { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string Initials => DeriveInitials(Name);
+
+    private static string DeriveInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "C";
+        }
+
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return "C";
+        }
+
+        var initials = string.Concat(parts.Take(2).Select(p => char.ToUpperInvariant(p[0])));
+        return initials;
+    }
+
+    private static string FormatLastInvoiceDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("MMM dd, yyyy") : "not yet";
+    }
+}

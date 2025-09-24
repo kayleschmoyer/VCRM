@@ -1,0 +1,64 @@
+/* List.razor.css: Elevates the customers table with responsive padding and hover effects. */
+.crm-customers-container {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.crm-page-title {
+    letter-spacing: -0.01em;
+}
+
+.crm-page-subtitle {
+    color: rgba(71, 85, 105, 0.85);
+}
+
+.crm-search-shell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
+}
+
+.crm-result-count {
+    font-weight: 500;
+}
+
+.crm-table-shell {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.crm-customer-row {
+    cursor: pointer;
+    transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.crm-customer-row:hover {
+    transform: translateX(4px);
+    background-color: rgba(54, 97, 255, 0.08);
+}
+
+.crm-email-cell {
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 959.95px) {
+    .crm-customers-container {
+        padding-inline: 1rem;
+    }
+
+    .crm-search-shell {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .crm-result-count {
+        align-self: flex-start;
+    }
+}

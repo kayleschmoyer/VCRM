@@ -1,0 +1,147 @@
+@* List.razor: Customers workspace landing page with responsive table, instant filtering, and action affordances. *@
+@page "/customers"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject ICustomerDirectory CustomerDirectory
+@inject NavigationManager NavigationManager
+
+<MudStack Spacing="3" Class="crm-customers-container">
+    <MudStack Spacing="0.5">
+        <MudText Typo="Typo.h4" Class="crm-page-title">Customer success hub</MudText>
+        <MudText Typo="Typo.body1" Class="crm-page-subtitle">Review active relationships, unlock insights, and accelerate follow-ups.</MudText>
+    </MudStack>
+
+    <MudPaper Elevation="1" Class="crm-search-shell" Square="false">
+        <CustomerSearchBar OnSearch="HandleSearchAsync"
+                           OnCleared="ResetFilter"
+                           Placeholder="Search by name, email, or phone"
+                           DebounceInterval="220" />
+        <MudChip Variant="Variant.Outlined" Color="Color.Primary" Class="crm-result-count" Icon="@Icons.Material.Filled.Group">
+            @_filteredCustomers.Count customers
+        </MudChip>
+    </MudPaper>
+
+    <MudPaper Elevation="1" Class="crm-table-shell">
+        <MudTable Items="@_filteredCustomers"
+                  Loading="@_isLoading"
+                  Hover="true"
+                  Bordered="false"
+                  Dense="false"
+                  Breakpoint="Breakpoint.Sm"
+                  RowsPerPage="@_rowsPerPage"
+                  RowsPerPageOptions="@_rowsPerPageOptions"
+                  @ref="_table"
+                  OnRowClick="HandleRowClick"
+                  RowClassFunc="@(_ => \"crm-customer-row\")">
+            <ToolBarContent>
+                <MudText Typo="Typo.subtitle1">Directory</MudText>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Phone</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh class="text-center">Vehicles</MudTh>
+                <MudTh>Last invoice</MudTh>
+                <MudTh Class="text-right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    <MudStack Spacing="0.5">
+                        <MudText Typo="Typo.subtitle2">@context.Name</MudText>
+                        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Email</MudText>
+                        </MudHidden>
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="Phone">@context.Phone</MudTd>
+                <MudTd DataLabel="Email" Class="crm-email-cell">@context.Email</MudTd>
+                <MudTd DataLabel="Vehicles" Align="DataGridCellAlign.Center">@context.VehicleCount</MudTd>
+                <MudTd DataLabel="Last invoice">@FormatLastInvoiceDate(context.LastInvoiceDate)</MudTd>
+                <MudTd DataLabel="Actions" Class="text-right">
+                    <ActionButtons OnView="@(() => NavigateToDetail(context.Id))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-6">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Secondary" Size="Size.Large" />
+                    <MudText Typo="Typo.subtitle1">No customers match that search</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-secondary-text">Try a different phrase or clear the filter.</MudText>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <MudStack Spacing="2">
+            @foreach (var customer in _filteredCustomers)
+            {
+                <CustomerCard Name="@customer.Name"
+                              Email="@customer.Email"
+                              Phone="@customer.Phone"
+                              VehicleCount="@customer.VehicleCount"
+                              LastInvoiceDate="@customer.LastInvoiceDate">
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Material.Filled.ArrowForward"
+                               OnClick="@(() => NavigateToDetail(customer.Id))">
+                        View profile
+                    </MudButton>
+                </CustomerCard>
+            }
+        </MudStack>
+    </MudHidden>
+</MudStack>
+
+@code {
+    private readonly int[] _rowsPerPageOptions = { 10, 25, 50 };
+    private IReadOnlyList<CustomerSummary> _allCustomers = Array.Empty<CustomerSummary>();
+    private List<CustomerSummary> _filteredCustomers = new();
+    private MudTable<CustomerSummary>? _table;
+    private int _rowsPerPage = 10;
+    private bool _isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        _allCustomers = await CustomerDirectory.GetCustomersAsync();
+        _filteredCustomers = _allCustomers.ToList();
+        _isLoading = false;
+    }
+
+    private async Task HandleSearchAsync(string query)
+    {
+        var sanitized = query?.Trim() ?? string.Empty;
+        _filteredCustomers = string.IsNullOrWhiteSpace(sanitized)
+            ? _allCustomers.ToList()
+            : _allCustomers.Where(customer => Matches(customer, sanitized)).ToList();
+
+        _table?.SetPage(0);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task ResetFilter()
+    {
+        return HandleSearchAsync(string.Empty);
+    }
+
+    private static bool Matches(CustomerSummary customer, string query)
+    {
+        return customer.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || customer.Email.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || customer.Phone.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void HandleRowClick(TableRowClickEventArgs<CustomerSummary> args)
+    {
+        NavigateToDetail(args.Item.Id);
+    }
+
+    private void NavigateToDetail(Guid id)
+    {
+        NavigationManager.NavigateTo($"/customers/{id}");
+    }
+
+    private static string FormatLastInvoiceDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("MMM dd, yyyy") : "—";
+    }
+}

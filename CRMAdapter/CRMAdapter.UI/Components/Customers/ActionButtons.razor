@@ -1,0 +1,43 @@
+@* ActionButtons.razor: Normalized action cluster with motion affordances for list rows. *@
+<MudStack Row="true" Spacing="0.5" Class="crm-action-buttons">
+    <MudTooltip Text="View record">
+        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       aria-label="View customer"
+                       OnClick="OnView" />
+    </MudTooltip>
+    <MudTooltip Text="Edit coming soon">
+        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                       Disabled="@(!EditEnabled)"
+                       Color="Color.Default"
+                       Size="Size.Small"
+                       aria-label="Edit customer"
+                       OnClick="OnEdit" />
+    </MudTooltip>
+    <MudTooltip Text="Delete coming soon">
+        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                       Disabled="@(!DeleteEnabled)"
+                       Color="Color.Default"
+                       Size="Size.Small"
+                       aria-label="Delete customer"
+                       OnClick="OnDelete" />
+    </MudTooltip>
+</MudStack>
+
+@code {
+    [Parameter]
+    public EventCallback OnView { get; set; }
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Parameter]
+    public bool EditEnabled { get; set; }
+
+    [Parameter]
+    public bool DeleteEnabled { get; set; }
+}
