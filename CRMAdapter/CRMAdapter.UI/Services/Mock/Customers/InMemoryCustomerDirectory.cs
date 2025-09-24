@@ -42,6 +42,12 @@ public sealed class InMemoryCustomerDirectory : ICustomerService
         return Task.FromResult(customer);
     }
 
+    public Task<CustomerDetail> SaveCustomerAsync(CustomerDetail customer, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(customer);
+    }
+
     private static IReadOnlyList<CustomerDetail> SeedCustomers()
     {
         var appointmentsByCustomer = AppointmentSeedData.Records

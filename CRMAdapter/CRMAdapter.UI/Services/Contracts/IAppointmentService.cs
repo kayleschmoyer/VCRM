@@ -24,4 +24,6 @@ public interface IAppointmentService
     Task<IReadOnlyList<AppointmentSummary>> GetUpcomingAppointmentsAsync(int count, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<string>> GetStatusesAsync(CancellationToken cancellationToken = default);
+
+    Task<AppointmentDetail> SaveAppointmentAsync(AppointmentDetail appointment, CancellationToken cancellationToken = default);
 }

@@ -103,6 +103,12 @@ public sealed class InMemoryAppointmentBook : IAppointmentService
         return Task.FromResult<IReadOnlyList<string>>(statuses);
     }
 
+    public Task<AppointmentDetail> SaveAppointmentAsync(AppointmentDetail appointment, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(appointment);
+    }
+
     internal static AppointmentSummary CreateSummary(AppointmentSeedRecord record)
     {
         return new AppointmentSummary(
