@@ -55,15 +55,21 @@ namespace CRMAdapter.Factory
         /// Creates an options instance using the supplied logger and default retry/rate limiting implementations.
         /// </summary>
         /// <param name="logger">Logger to use for adapters.</param>
+        /// <param name="maxConcurrency">Maximum number of concurrent adapter operations permitted per rate limiter.</param>
         /// <returns>An options instance.</returns>
-        public static AdapterFactoryOptions SecureDefaults(IAdapterLogger? logger = null)
+        public static AdapterFactoryOptions SecureDefaults(IAdapterLogger? logger = null, int maxConcurrency = 16)
         {
+            if (maxConcurrency <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxConcurrency), "Concurrency limit must be positive.");
+            }
+
             var resolvedLogger = logger ?? NullAdapterLogger.Instance;
             return new AdapterFactoryOptions
             {
                 Logger = resolvedLogger,
                 RetryPolicy = new ExponentialBackoffRetryPolicy(logger: resolvedLogger),
-                RateLimiter = NoopAdapterRateLimiter.Instance
+                RateLimiter = new SemaphoreAdapterRateLimiter(maxConcurrency)
             };
         }
     }
