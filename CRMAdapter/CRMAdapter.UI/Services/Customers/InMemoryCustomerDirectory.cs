@@ -52,9 +52,9 @@ public sealed class InMemoryCustomerDirectory : ICustomerDirectory
                 "National 3PL partner prioritizing electrified fleets and predictive maintenance programs.",
                 new List<VehicleRecord>
                 {
-                    new("1FTEW1EP3PKA12345", "2023", "Ford F-150 Lightning", "Active"),
-                    new("1GC4YVEY2NF152233", "2022", "Chevrolet Silverado HD", "In service"),
-                    new("3N1AB8CV3MY225601", "2021", "Nissan Leaf Fleet", "Active")
+                    new(Guid.Parse("2b66a1f2-2b34-4a94-b2b3-9c7ae2d0d4fa"), "1FTEW1EP3PKA12345", "2023", "Ford F-150 Lightning", "Active"),
+                    new(Guid.Parse("7f1ec5f0-273a-4b02-a5e3-04f5bcd00b6a"), "1GC4YVEY2NF152233", "2022", "Chevrolet Silverado HD", "In service"),
+                    new(Guid.Parse("56d7b2d4-8b38-49be-bd23-1b4dc191f70e"), "3N1AB8CV3MY225601", "2021", "Nissan Leaf Fleet", "Active")
                 },
                 new List<InvoiceRecord>
                 {
@@ -76,8 +76,8 @@ public sealed class InMemoryCustomerDirectory : ICustomerDirectory
                 "Regional service network delivering rapid-response maintenance for commercial EVs.",
                 new List<VehicleRecord>
                 {
-                    new("5YJSA1E26JF275911", "2020", "Tesla Model S Performance", "Active"),
-                    new("1C6SRFMT1LN245877", "2021", "RAM 1500 Tradesman", "Awaiting parts")
+                    new(Guid.Parse("f7b1b822-75c7-4f89-8f0f-82c4309a5ba0"), "5YJSA1E26JF275911", "2020", "Tesla Model S Performance", "Active"),
+                    new(Guid.Parse("b058c752-2693-40ed-9be4-54d13fd88019"), "1C6SRFMT1LN245877", "2021", "RAM 1500 Tradesman", "Awaiting parts")
                 },
                 new List<InvoiceRecord>
                 {
@@ -100,10 +100,10 @@ public sealed class InMemoryCustomerDirectory : ICustomerDirectory
                 "Autonomous shuttle innovator leveraging CRM Adapter to orchestrate deployments.",
                 new List<VehicleRecord>
                 {
-                    new("WBY1Z4C58EV547221", "2024", "BMW iX Shuttle", "Active"),
-                    new("JHMZE2H75AS015462", "2022", "Honda Insight Fleet", "In diagnostics"),
-                    new("2C4RC1BG5HR677451", "2021", "Chrysler Pacifica Hybrid", "Active"),
-                    new("1HGCV1F39LA067811", "2020", "Honda Accord Hybrid", "Retired")
+                    new(Guid.Parse("17fe4cbb-08f1-4a4e-bc26-5aba25ad607c"), "WBY1Z4C58EV547221", "2024", "BMW iX Shuttle", "Active"),
+                    new(Guid.Parse("f44f6c61-18a7-4b09-9c10-1c7c79855a34"), "JHMZE2H75AS015462", "2022", "Honda Insight Fleet", "In diagnostics"),
+                    new(Guid.Parse("2b331d6c-7fb2-4a42-955a-01f8a0fa7a62"), "2C4RC1BG5HR677451", "2021", "Chrysler Pacifica Hybrid", "Active"),
+                    new(Guid.Parse("73a1f2fe-6475-4b47-8178-3bfe5d9dd26a"), "1HGCV1F39LA067811", "2020", "Honda Accord Hybrid", "Retired")
                 },
                 new List<InvoiceRecord>
                 {

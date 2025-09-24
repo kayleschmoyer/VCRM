@@ -1,0 +1,54 @@
+@* HistoryTable.razor: Generic timeline table for invoices, appointments, and other vehicle history streams. *@
+<MudTable Items="@Items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm" Class="crm-history-table">
+    <HeaderContent>
+        <MudTh>@PrimaryLabel</MudTh>
+        <MudTh>@SecondaryLabel</MudTh>
+        <MudTh>@TertiaryLabel</MudTh>
+        @if (ShowQuaternary)
+        {
+            <MudTh>@QuaternaryLabel</MudTh>
+        }
+        <MudTh class="text-right">@StatusLabel</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="@PrimaryLabel">@context.Primary</MudTd>
+        <MudTd DataLabel="@SecondaryLabel">@context.Secondary</MudTd>
+        <MudTd DataLabel="@TertiaryLabel">@context.Tertiary</MudTd>
+        @if (ShowQuaternary)
+        {
+            <MudTd DataLabel="@QuaternaryLabel">@context.Quaternary</MudTd>
+        }
+        <MudTd DataLabel="@StatusLabel" Class="text-right">
+            <MudChip Color="@context.StatusColor" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-6">
+            <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Color="Color.Secondary" Size="Size.Medium" />
+            <MudText Typo="Typo.subtitle2">No history records yet</MudText>
+            <MudText Typo="Typo.caption" Class="mud-secondary-text">Activity will appear here once scheduled or billed.</MudText>
+        </MudStack>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    [Parameter]
+    public string PrimaryLabel { get; set; } = "Primary";
+
+    [Parameter]
+    public string SecondaryLabel { get; set; } = "Secondary";
+
+    [Parameter]
+    public string TertiaryLabel { get; set; } = "Tertiary";
+
+    [Parameter]
+    public string? QuaternaryLabel { get; set; }
+
+    [Parameter]
+    public string StatusLabel { get; set; } = "Status";
+
+    [Parameter]
+    public IReadOnlyList<HistoryEntry> Items { get; set; } = Array.Empty<HistoryEntry>();
+
+    private bool ShowQuaternary => !string.IsNullOrWhiteSpace(QuaternaryLabel);
+}

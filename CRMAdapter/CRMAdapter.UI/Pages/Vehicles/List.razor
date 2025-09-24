@@ -1,0 +1,214 @@
+@* List.razor: Vehicle intelligence workspace with responsive table, deep filtering, and customer-aware navigation. *@
+@page "/vehicles"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject IVehicleRegistry VehicleRegistry
+@inject NavigationManager NavigationManager
+
+<MudStack Spacing="3" Class="crm-vehicles-container">
+    <MudStack Spacing="0.5">
+        <MudText Typo="Typo.h4" Class="crm-page-title">Fleet intelligence center</MudText>
+        <MudText Typo="Typo.body1" Class="crm-page-subtitle">Monitor every asset, accelerate service decisions, and keep customers delighted.</MudText>
+    </MudStack>
+
+    <MudPaper Elevation="1" Class="crm-search-shell" Square="false">
+        <VehicleSearchBar OnSearch="HandleSearchAsync"
+                          OnCleared="ResetFilter"
+                          Placeholder="Search by VIN, plate, or customer"
+                          DebounceInterval="220" />
+        <MudChip Variant="Variant.Outlined" Color="Color.Primary" Class="crm-result-count" Icon="@Icons.Material.Filled.DirectionsCar">
+            @_filteredVehicles.Count vehicles
+        </MudChip>
+    </MudPaper>
+
+    <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudPaper Elevation="1" Class="crm-table-shell">
+            <MudTable Items="@_filteredVehicles"
+                      Loading="@_isLoading"
+                      Hover="true"
+                      Bordered="false"
+                      Dense="false"
+                      RowsPerPage="@_rowsPerPage"
+                      RowsPerPageOptions="@_rowsPerPageOptions"
+                      Breakpoint="Breakpoint.Sm"
+                      @ref="_table"
+                      OnRowClick="HandleRowClick"
+                      RowClassFunc="@(_ => \"crm-vehicle-row\")">
+                <ToolBarContent>
+                    <MudText Typo="Typo.subtitle1">Vehicles</MudText>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="@(_ => _.Vin)">
+                            VIN
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.Year)">
+                            Year
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.Make)">
+                            Make
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.Model)">
+                            Model
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.CustomerName)">
+                            Customer
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.LastServiceDate)">
+                            Last service
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh Class="text-right">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="VIN">
+                        <MudText Typo="Typo.subtitle2">@context.Vin</MudText>
+                        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">Plate @context.Plate</MudText>
+                        </MudHidden>
+                    </MudTd>
+                    <MudTd DataLabel="Year">@context.Year</MudTd>
+                    <MudTd DataLabel="Make">@context.Make</MudTd>
+                    <MudTd DataLabel="Model">
+                        <MudStack Spacing="0.5">
+                            <MudText Typo="Typo.subtitle2">@context.Model</MudText>
+                            <MudChip Size="Size.Small"
+                                     Variant="Variant.Outlined"
+                                     Color="@StatusColorCatalog.Resolve(context.Status)"
+                                     Class="crm-status-chip">@context.Status</MudChip>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Customer">
+                        <MudLink Href="@GetCustomerUrl(context.CustomerId)" Color="Color.Primary">@context.CustomerName</MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Last service">@FormatServiceDate(context.LastServiceDate)</MudTd>
+                    <MudTd DataLabel="Actions" Class="text-right">
+                        <MudTooltip Text="View vehicle">
+                            <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           aria-label="View vehicle"
+                                           OnClick="@(() => NavigateToDetail(context.Id))" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-6">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Secondary" Size="Size.Large" />
+                        <MudText Typo="Typo.subtitle1">No vehicles match that search</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-secondary-text">Try a different VIN, plate, or customer name.</MudText>
+                    </MudStack>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudHidden>
+
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <MudStack Spacing="2">
+            @if (_isLoading)
+            {
+                <MudPaper Elevation="1" Class="pa-4 text-center">
+                    <MudProgressCircular Indeterminate="true" />
+                </MudPaper>
+            }
+            else if (_filteredVehicles.Count == 0)
+            {
+                <MudPaper Elevation="1" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Secondary" Size="Size.Large" />
+                    <MudText Typo="Typo.subtitle1">No vehicles match that search</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                @foreach (var vehicle in _filteredVehicles)
+                {
+                    <VehicleCard Vin="@vehicle.Vin"
+                                 Year="@vehicle.Year"
+                                 Make="@vehicle.Make"
+                                 Model="@vehicle.Model"
+                                 Plate="@vehicle.Plate"
+                                 Status="@vehicle.Status"
+                                 StatusColor="@StatusColorCatalog.Resolve(vehicle.Status)"
+                                 OwnerName="@vehicle.CustomerName"
+                                 OwnerHref="@GetCustomerUrl(vehicle.CustomerId)">
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   OnClick="@(() => NavigateToDetail(vehicle.Id))">
+                            View details
+                        </MudButton>
+                    </VehicleCard>
+                }
+            }
+        </MudStack>
+    </MudHidden>
+</MudStack>
+
+@code {
+    private readonly int[] _rowsPerPageOptions = { 10, 25, 50 };
+    private IReadOnlyList<VehicleSummary> _allVehicles = Array.Empty<VehicleSummary>();
+    private List<VehicleSummary> _filteredVehicles = new();
+    private MudTable<VehicleSummary>? _table;
+    private int _rowsPerPage = 10;
+    private bool _isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        _allVehicles = await VehicleRegistry.GetVehiclesAsync();
+        _filteredVehicles = _allVehicles.ToList();
+        _isLoading = false;
+    }
+
+    private async Task HandleSearchAsync(string query)
+    {
+        var sanitized = query?.Trim() ?? string.Empty;
+        _filteredVehicles = string.IsNullOrWhiteSpace(sanitized)
+            ? _allVehicles.ToList()
+            : _allVehicles.Where(vehicle => Matches(vehicle, sanitized)).ToList();
+
+        _table?.SetPage(0);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task ResetFilter()
+    {
+        return HandleSearchAsync(string.Empty);
+    }
+
+    private static bool Matches(VehicleSummary vehicle, string query)
+    {
+        return vehicle.Vin.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || vehicle.Plate.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || vehicle.CustomerName.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void HandleRowClick(TableRowClickEventArgs<VehicleSummary> args)
+    {
+        NavigateToDetail(args.Item.Id);
+    }
+
+    private void NavigateToDetail(Guid id)
+    {
+        NavigationManager.NavigateTo($"/vehicles/{id}");
+    }
+
+    private string GetCustomerUrl(Guid customerId)
+    {
+        return $"/customers/{customerId}";
+    }
+
+    private static string FormatServiceDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("MMM dd, yyyy") : "—";
+    }
+}

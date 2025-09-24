@@ -1,0 +1,12 @@
+/* HistoryTable.razor.css: Tones the shared history table with elevated table row styling. */
+.crm-history-table {
+    border-radius: 12px;
+}
+
+.crm-history-table tr:hover {
+    background-color: rgba(54, 97, 255, 0.06);
+}
+
+.crm-history-table .mud-chip {
+    font-weight: 600;
+}

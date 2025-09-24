@@ -1,0 +1,25 @@
+/* VehicleSearchBar.razor.css: Aligns the vehicle search control with shell spacing and iconography. */
+.crm-vehicle-search {
+    padding: 0.25rem 0.5rem;
+}
+
+.crm-vehicle-search-input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.crm-vehicle-search-clear {
+    margin-left: 0.5rem;
+}
+
+@media (max-width: 599.95px) {
+    .crm-vehicle-search {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .crm-vehicle-search-clear {
+        align-self: flex-end;
+    }
+}
