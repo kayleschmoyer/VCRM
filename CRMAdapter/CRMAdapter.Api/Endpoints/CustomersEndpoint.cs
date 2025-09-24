@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonDomain;
+using CRMAdapter.CommonSecurity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -42,7 +42,7 @@ public static class CustomersEndpoint
             .WithName("GetCustomerById")
             .WithSummary("Retrieves a canonical customer by identifier.")
             .WithDescription("Returns the canonical customer aggregate projected by the configured adapter.")
-            .RequireAuthorization(AuthPolicies.CustomerRead)
+            .RequireAuthorization(RbacPolicy.GetPolicyName(RbacAction.CustomerView))
             .Produces<Customer>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized);
@@ -51,7 +51,7 @@ public static class CustomersEndpoint
             .WithName("SearchCustomers")
             .WithSummary("Performs a canonical customer search.")
             .WithDescription("Invokes the configured adapter search pipeline using canonical semantics.")
-            .RequireAuthorization(AuthPolicies.CustomerSearch)
+            .RequireAuthorization(RbacPolicy.GetPolicyName(RbacAction.CustomerSearch))
             .Produces<IReadOnlyCollection<Customer>>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized);

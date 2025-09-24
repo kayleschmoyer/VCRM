@@ -1,6 +1,7 @@
 // Program.cs: Configures dependency injection, security, and MudBlazor services for the CRM Adapter UI.
 using System.IO;
 using System.Net.Http.Headers;
+using CRMAdapter.CommonSecurity;
 using CRMAdapter.UI.Auth;
 using CRMAdapter.UI.Core.DataSource;
 using CRMAdapter.UI.Core.Storage;
@@ -33,7 +34,10 @@ using MudBlazor.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOptions();
-builder.Services.AddAuthorization(options => RolePolicies.RegisterPolicies(options));
+var rbacMatrix = RbacPolicy.LoadAsync(builder.Environment).GetAwaiter().GetResult();
+builder.Services.AddSingleton(rbacMatrix);
+builder.Services.AddSingleton<IRbacAuthorizationService, RbacAuthorizationService>();
+builder.Services.AddAuthorization(options => RbacPolicy.RegisterPolicies(options, rbacMatrix));
 
 builder.Services.AddAuthentication(options =>
     {

@@ -1,6 +1,6 @@
 @* Detail.razor: Immersive invoice workspace fusing financial clarity with customer and vehicle context. *@
 @page "/invoices/{InvoiceId:guid}"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
+@attribute [Authorize(Policy = RbacPolicyNames.InvoiceView)]
 @inject IInvoiceService InvoiceWorkspace
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService

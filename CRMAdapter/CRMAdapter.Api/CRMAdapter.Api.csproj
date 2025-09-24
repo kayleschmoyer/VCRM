@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CRMAdapter.Core\CRMAdapter.Core.csproj" />
+    <ProjectReference Include="..\CommonSecurity\CommonSecurity.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +31,10 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Config\appsettings.Development.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CommonConfig\RbacMatrix.json">
+      <Link>Config\RbacMatrix.json</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <None Include="Docs\openapi.xml" />

@@ -1,6 +1,6 @@
 @* Schedule.razor: Weekly calendar-inspired visualization of appointments with mobile-friendly layout. *@
 @page "/appointments/schedule"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@attribute [Authorize(Policy = RbacPolicyNames.AppointmentView)]
 @inject IAppointmentService AppointmentBook
 @inject NavigationManager NavigationManager
 

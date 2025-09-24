@@ -1,0 +1,28 @@
+@* RoleAwareNav.razor: Wraps navigation links with RBAC-aware visibility using AuthorizeView. *@
+@using CRMAdapter.CommonSecurity
+<AuthorizeView Policy="@Link.PolicyName">
+    <Authorized>
+        <MudNavLink Href="@Link.Href"
+                    Icon="@Link.Icon"
+                    Match="NavLinkMatch.Prefix"
+                    DisableRipple="true"
+                    Class="@CssClass"
+                    OnClick="OnNavigate">
+            <div class="crm-nav-link-content">
+                <span class="crm-nav-link-title">@Link.Title</span>
+                <span class="crm-nav-link-description">@Link.Description</span>
+            </div>
+        </MudNavLink>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [Parameter]
+    public NavigationLink Link { get; set; } = default!;
+
+    [Parameter]
+    public string CssClass { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnNavigate { get; set; }
+}

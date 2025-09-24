@@ -3,9 +3,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonDomain;
+using CRMAdapter.CommonSecurity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -37,7 +37,7 @@ public static class InvoicesEndpoint
             .WithName("GetInvoiceById")
             .WithSummary("Retrieves a canonical invoice by identifier.")
             .WithDescription("Returns the canonical invoice projection produced by the adapter layer.")
-            .RequireAuthorization(AuthPolicies.InvoiceRead)
+            .RequireAuthorization(RbacPolicy.GetPolicyName(RbacAction.InvoiceView))
             .Produces<Invoice>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized);

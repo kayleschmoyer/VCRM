@@ -11,10 +11,10 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonDomain;
 using CRMAdapter.Factory;
+using CRMAdapter.CommonSecurity;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -68,7 +68,7 @@ public sealed class Api_CustomerEndpointTests : IAsyncLifetime
     public Task InitializeAsync()
     {
         _client = _factory.CreateClient();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GenerateToken(AuthPolicies.Roles.Admin));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GenerateToken(RbacRole.Admin));
         return Task.CompletedTask;
     }
 
@@ -101,7 +101,7 @@ public sealed class Api_CustomerEndpointTests : IAsyncLifetime
         payload.PostalAddress.City.Should().Be("London");
     }
 
-    private static string GenerateToken(string role)
+    private static string GenerateToken(RbacRole role)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestSigningKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -112,7 +112,7 @@ public sealed class Api_CustomerEndpointTests : IAsyncLifetime
             subject: new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.Role, role),
+                new Claim(ClaimTypes.Role, role.ToString()),
             }),
             notBefore: DateTime.UtcNow.AddMinutes(-1),
             expires: DateTime.UtcNow.AddHours(1),

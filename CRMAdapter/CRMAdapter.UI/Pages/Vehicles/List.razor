@@ -1,6 +1,6 @@
 @* List.razor: Vehicle intelligence workspace with responsive table, deep filtering, and customer-aware navigation. *@
 @page "/vehicles"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@attribute [Authorize(Policy = RbacPolicyNames.VehicleView)]
 @inject IVehicleService VehicleRegistry
 @inject NavigationManager NavigationManager
 

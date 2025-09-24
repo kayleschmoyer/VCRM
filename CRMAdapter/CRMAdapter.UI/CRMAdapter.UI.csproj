@@ -16,7 +16,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\CommonConfig\RbacMatrix.json">
+      <Link>Config\RbacMatrix.json</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CRMAdapter.Core\CRMAdapter.Core.csproj" />
+    <ProjectReference Include="..\CommonSecurity\CommonSecurity.csproj" />
   </ItemGroup>
 
 </Project>

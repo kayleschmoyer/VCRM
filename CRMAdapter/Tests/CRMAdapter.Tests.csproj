@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="../CRMAdapter.Core/CRMAdapter.Core.csproj" />
     <ProjectReference Include="../CRMAdapter.Api/CRMAdapter.Api.csproj" />
+    <ProjectReference Include="../CommonSecurity/CommonSecurity.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
     <Compile Include="SecurityTests/**/*.cs" />
     <Compile Include="ChaosTests/**/*.cs" />
     <Compile Include="TestUtilities/**/*.cs" />
+    <Compile Include="RbacTests/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

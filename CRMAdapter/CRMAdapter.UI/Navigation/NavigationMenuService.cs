@@ -1,11 +1,11 @@
-// NavigationMenuService.cs: Supplies role-trimmed navigation items and active route utilities for the layout.
+// NavigationMenuService.cs: Supplies RBAC-trimmed navigation items and active route utilities for the layout.
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using CRMAdapter.CommonSecurity;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using CRMAdapter.UI.Auth;
 
 namespace CRMAdapter.UI.Navigation;
 
@@ -13,25 +13,32 @@ public sealed class NavigationMenuService
 {
     private static readonly IReadOnlyList<NavigationLink> Links = new List<NavigationLink>
     {
-        new("Dashboard", Icons.Material.Filled.Insights, "/dashboard", "Executive overview with actionable KPIs.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
-        new("Customers", Icons.Material.Filled.PeopleAlt, "/customers", "360° customer directory and relationship insights.", RolePolicies.AllRoles),
-        new("Appointments", Icons.Material.Filled.EventAvailable, "/appointments", "Scheduling, technician dispatch, and service visibility.", RolePolicies.AllRoles),
-        new("Invoices", Icons.Material.Filled.ReceiptLong, "/invoices", "Billing performance, balances, and payment activity.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
-        new("Vehicles", Icons.Material.Filled.DirectionsCar, "/vehicles", "Unified fleet management and service visibility.", RolePolicies.AllRoles),
-        new("Operations", Icons.Material.Filled.PrecisionManufacturing, "/operations", "Order orchestration and fulfillment visibility.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
-        new("Field Service", Icons.Material.Filled.HomeRepairService, "/field-service", "Technician dispatching and status intelligence.", new[] { RolePolicies.Tech, RolePolicies.Manager }),
-        new("Data Stewardship", Icons.Material.Filled.Storage, "/data-quality", "Data quality dashboards and stewardship workflows.", new[] { RolePolicies.Admin, RolePolicies.Manager }),
-        new("Support Desk", Icons.Material.Filled.SupportAgent, "/support", "Customer support command console and SLA tracking.", new[] { RolePolicies.Admin, RolePolicies.Clerk })
+        new("Dashboard", Icons.Material.Filled.Insights, "/dashboard", "Executive overview with actionable KPIs.", RbacAction.DashboardView),
+        new("Customers", Icons.Material.Filled.PeopleAlt, "/customers", "360° customer directory and relationship insights.", RbacAction.CustomerView),
+        new("Appointments", Icons.Material.Filled.EventAvailable, "/appointments", "Scheduling, technician dispatch, and service visibility.", RbacAction.AppointmentView),
+        new("Invoices", Icons.Material.Filled.ReceiptLong, "/invoices", "Billing performance, balances, and payment activity.", RbacAction.InvoiceView),
+        new("Vehicles", Icons.Material.Filled.DirectionsCar, "/vehicles", "Unified fleet management and service visibility.", RbacAction.VehicleView),
+        new("Operations", Icons.Material.Filled.PrecisionManufacturing, "/operations", "Order orchestration and fulfillment visibility.", RbacAction.OperationsView),
+        new("Field Service", Icons.Material.Filled.HomeRepairService, "/field-service", "Technician dispatching and status intelligence.", RbacAction.FieldServiceView),
+        new("Data Stewardship", Icons.Material.Filled.Storage, "/data-quality", "Data quality dashboards and stewardship workflows.", RbacAction.DataQualityView),
+        new("Support Desk", Icons.Material.Filled.SupportAgent, "/support", "Customer support command console and SLA tracking.", RbacAction.SupportView)
     };
+
+    private readonly IRbacAuthorizationService _authorizationService;
+
+    public NavigationMenuService(IRbacAuthorizationService authorizationService)
+    {
+        _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
+    }
 
     public IEnumerable<NavigationLink> GetLinksForUser(ClaimsPrincipal? user)
     {
         if (user?.Identity?.IsAuthenticated != true)
         {
-            return Links.Where(l => l.AllowedRoles.Length == 0);
+            return Array.Empty<NavigationLink>();
         }
 
-        return Links.Where(link => link.AllowedRoles.Length == 0 || link.AllowedRoles.Any(user.IsInRole)).ToArray();
+        return Links.Where(link => _authorizationService.HasAccess(user, link.RequiredAction)).ToArray();
     }
 
     public bool IsActive(NavigationManager navigationManager, NavigationLink link)
