@@ -1,0 +1,59 @@
+{
+  "backendName": "VastOnline",
+  "schemaVersion": "1.0",
+  "mappings": {
+    "Customer": {
+      "__source": "[dbo].[Customers]",
+      "Id": "[dbo].[Customers].[CustomerId]",
+      "Name": "[dbo].[Customers].[DisplayName]",
+      "Email": "[dbo].[Customers].[Email]",
+      "Phone": "[dbo].[Customers].[Phone]",
+      "AddressLine1": "[dbo].[Customers].[Line1]",
+      "AddressLine2": "[dbo].[Customers].[Line2]",
+      "City": "[dbo].[Customers].[City]",
+      "State": "[dbo].[Customers].[State]",
+      "PostalCode": "[dbo].[Customers].[PostalCode]",
+      "Country": "[dbo].[Customers].[Country]",
+      "ModifiedOn": "[dbo].[Customers].[ModifiedOn]"
+    },
+    "Vehicle": {
+      "__source": "[dbo].[Vehicles]",
+      "Id": "[dbo].[Vehicles].[VehicleId]",
+      "CustomerId": "[dbo].[Vehicles].[CustomerId]",
+      "Vin": "[dbo].[Vehicles].[Vin]",
+      "Make": "[dbo].[Vehicles].[Make]",
+      "Model": "[dbo].[Vehicles].[Model]",
+      "ModelYear": "[dbo].[Vehicles].[ModelYear]",
+      "Odometer": "[dbo].[Vehicles].[Odometer]"
+    },
+    "Invoice": {
+      "__source": "[dbo].[Invoices]",
+      "Id": "[dbo].[Invoices].[InvoiceId]",
+      "CustomerId": "[dbo].[Invoices].[CustomerId]",
+      "VehicleId": "[dbo].[Invoices].[VehicleId]",
+      "Number": "[dbo].[Invoices].[InvoiceNumber]",
+      "Date": "[dbo].[Invoices].[InvoiceDate]",
+      "Total": "[dbo].[Invoices].[TotalAmount]",
+      "Status": "[dbo].[Invoices].[Status]"
+    },
+    "InvoiceLine": {
+      "__source": "[dbo].[InvoiceLines]",
+      "InvoiceId": "[dbo].[InvoiceLines].[InvoiceId]",
+      "Description": "[dbo].[InvoiceLines].[Description]",
+      "Quantity": "[dbo].[InvoiceLines].[Quantity]",
+      "UnitPrice": "[dbo].[InvoiceLines].[UnitPrice]",
+      "Tax": "[dbo].[InvoiceLines].[TaxAmount]"
+    },
+    "Appointment": {
+      "__source": "[dbo].[Appointments]",
+      "Id": "[dbo].[Appointments].[AppointmentId]",
+      "CustomerId": "[dbo].[Appointments].[CustomerId]",
+      "VehicleId": "[dbo].[Appointments].[VehicleId]",
+      "Start": "[dbo].[Appointments].[StartTime]",
+      "End": "[dbo].[Appointments].[EndTime]",
+      "Advisor": "[dbo].[Appointments].[Advisor]",
+      "Status": "[dbo].[Appointments].[Status]",
+      "Location": "[dbo].[Appointments].[Location]"
+    }
+  }
+}

@@ -1,0 +1,92 @@
+trigger:
+  branches:
+    include:
+      - main
+      - master
+
+schedules:
+  - cron: "0 6 * * *"
+    branches:
+      include:
+        - main
+    always: true
+    displayName: Nightly Load & Security
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  BuildConfiguration: 'Release'
+  ArtifactsDir: 'CRMAdapter/Artifacts'
+
+stages:
+  - stage: BuildAndTest
+    jobs:
+      - job: dotnet
+        steps:
+          - checkout: self
+
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '8.0.x'
+
+          - script: dotnet restore CRMAdapter/CRMAdapter.sln
+            displayName: Restore
+
+          - script: dotnet build CRMAdapter/CRMAdapter.sln --configuration $(BuildConfiguration) --no-restore
+            displayName: Build
+
+          - script: |
+              dotnet test CRMAdapter/CRMAdapter.sln \
+                --configuration $(BuildConfiguration) \
+                --no-build \
+                --results-directory $(ArtifactsDir)/TestResults \
+                --logger "trx;LogFileName=TestResults.trx" \
+                --logger "junit;LogFileName=TestResults.xml" \
+                --collect:"XPlat Code Coverage"
+            displayName: Test with coverage
+
+          - script: dotnet tool install --global dotnet-reportgenerator-globaltool
+            displayName: Install ReportGenerator
+
+          - script: |
+              export PATH="$PATH:$HOME/.dotnet/tools"
+              reportgenerator \
+                "-reports:$(ArtifactsDir)/TestResults/**/*.cobertura.xml" \
+                "-targetdir:$(ArtifactsDir)/Coverage" \
+                "-reporttypes:Html;MarkdownSummary"
+            displayName: Generate coverage report
+
+          - script: |
+              if [ -f CRMAdapter/Tests/SecurityTests/Secrets_Gitleaks.toml ]; then
+                curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz | tar zx
+                ./gitleaks detect --no-banner --source . --config CRMAdapter/Tests/SecurityTests/Secrets_Gitleaks.toml
+              fi
+            displayName: Secret Scan (gitleaks)
+
+          - publish: $(ArtifactsDir)
+            artifact: test-artifacts
+            displayName: Publish artifacts
+
+  - stage: LoadTests
+    dependsOn: BuildAndTest
+    condition: eq(variables['Build.Reason'], 'Schedule')
+    jobs:
+      - job: k6
+        steps:
+          - checkout: self
+
+          - script: |
+              docker run --rm -v "$(System.DefaultWorkingDirectory)/CRMAdapter/Tests/LoadTests/k6:/scripts" grafana/k6 \
+                run /scripts/customer-list-load.test.js --vus 10 --duration 1m --out json=/scripts/customer-load.json
+            displayName: Customer list load test
+
+          - script: |
+              docker run --rm -v "$(System.DefaultWorkingDirectory)/CRMAdapter/Tests/LoadTests/k6:/scripts" grafana/k6 \
+                run /scripts/invoice-search-spike.test.js --out json=/scripts/invoice-spike.json
+            displayName: Invoice search spike test
+
+          - publish: CRMAdapter/Tests/LoadTests/k6
+            artifact: load-test-results
+            displayName: Publish load test results
