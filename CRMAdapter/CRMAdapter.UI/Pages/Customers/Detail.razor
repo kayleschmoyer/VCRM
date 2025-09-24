@@ -1,8 +1,8 @@
 @* Detail.razor: Immersive customer 360 with contextual insights and related data workspaces. *@
 @page "/customers/{CustomerId:guid}"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
-@inject ICustomerDirectory CustomerDirectory
-@inject IInvoiceWorkspace InvoiceWorkspace
+@inject ICustomerService CustomerDirectory
+@inject IInvoiceService InvoiceWorkspace
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-customer-detail">

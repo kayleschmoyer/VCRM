@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.UI.Services.Appointments;
+using CRMAdapter.UI.Services.Contracts;
+using CRMAdapter.UI.Services.Mock.Appointments;
 using CRMAdapter.UI.Services.Vehicles.Models;
 
-namespace CRMAdapter.UI.Services.Vehicles;
+namespace CRMAdapter.UI.Services.Mock.Vehicles;
 
-public sealed class InMemoryVehicleRegistry : IVehicleRegistry
+public sealed class InMemoryVehicleRegistry : IVehicleService
 {
     private readonly IReadOnlyList<VehicleDetail> _vehicles;
 

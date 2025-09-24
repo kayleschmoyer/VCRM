@@ -1,13 +1,13 @@
-// IInvoiceWorkspace.cs: Contract for exposing invoice summaries, detail, and payment orchestration to the UI.
+// IInvoiceService.cs: Stable contract for invoice querying and payment operations across data providers.
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.UI.Services.Invoices.Models;
 
-namespace CRMAdapter.UI.Services.Invoices;
+namespace CRMAdapter.UI.Services.Contracts;
 
-public interface IInvoiceWorkspace
+public interface IInvoiceService
 {
     Task<IReadOnlyList<InvoiceSummary>> GetInvoicesAsync(string? search = null, CancellationToken cancellationToken = default);
 

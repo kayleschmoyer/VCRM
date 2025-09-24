@@ -4,11 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CRMAdapter.UI.Services.Contracts;
 using CRMAdapter.UI.Services.Invoices.Models;
 
-namespace CRMAdapter.UI.Services.Invoices;
+namespace CRMAdapter.UI.Services.Mock.Invoices;
 
-public sealed class InMemoryInvoiceWorkspace : IInvoiceWorkspace
+public sealed class InMemoryInvoiceWorkspace : IInvoiceService
 {
     private readonly Dictionary<Guid, InvoiceRecord> _invoices;
     private readonly object _sync = new();

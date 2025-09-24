@@ -5,29 +5,27 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.UI.Services.Appointments;
 using CRMAdapter.UI.Services.Appointments.Models;
-using CRMAdapter.UI.Services.Customers;
 using CRMAdapter.UI.Services.Customers.Models;
+using CRMAdapter.UI.Services.Contracts;
 using CRMAdapter.UI.Services.Dashboard.Models;
-using CRMAdapter.UI.Services.Invoices;
 using CRMAdapter.UI.Services.Invoices.Models;
-using CRMAdapter.UI.Services.Vehicles;
+using CRMAdapter.UI.Services.Vehicles.Models;
 
-namespace CRMAdapter.UI.Services.Dashboard;
+namespace CRMAdapter.UI.Services.Mock.Dashboard;
 
-public sealed class InMemoryDashboardAnalytics : IDashboardAnalytics
+public sealed class InMemoryDashboardAnalytics : IDashboardService
 {
-    private readonly ICustomerDirectory _customers;
-    private readonly IVehicleRegistry _vehicles;
-    private readonly IInvoiceWorkspace _invoices;
-    private readonly IAppointmentBook _appointments;
+    private readonly ICustomerService _customers;
+    private readonly IVehicleService _vehicles;
+    private readonly IInvoiceService _invoices;
+    private readonly IAppointmentService _appointments;
 
     public InMemoryDashboardAnalytics(
-        ICustomerDirectory customers,
-        IVehicleRegistry vehicles,
-        IInvoiceWorkspace invoices,
-        IAppointmentBook appointments)
+        ICustomerService customers,
+        IVehicleService vehicles,
+        IInvoiceService invoices,
+        IAppointmentService appointments)
     {
         _customers = customers;
         _vehicles = vehicles;

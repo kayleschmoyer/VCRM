@@ -3,6 +3,7 @@
 @inject NavigationManager Navigation
 @inject AppThemeState ThemeState
 @inject ISnackbar Snackbar
+@inject IWebHostEnvironment HostEnvironment
 @implements IDisposable
 
 <MudLayout Class="crm-layout">
@@ -21,6 +22,10 @@
         <section class="crm-grid" aria-live="polite">
             <header class="crm-topbar">
                 <TopBar OnToggleNavigation="ToggleDrawer" OnThemeToggle="ToggleTheme" OnSearch="HandleSearch" />
+                @if (HostEnvironment.IsDevelopment())
+                {
+                    <DataSourceSwitch />
+                }
             </header>
             <main id="main-content" class="crm-content" tabindex="-1">
                 <MudPaper Class="crm-content-surface" Elevation="0">

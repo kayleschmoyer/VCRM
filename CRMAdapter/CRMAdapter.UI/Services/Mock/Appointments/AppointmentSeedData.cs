@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace CRMAdapter.UI.Services.Appointments;
+namespace CRMAdapter.UI.Services.Mock.Appointments;
 
 internal static class AppointmentSeedData
 {

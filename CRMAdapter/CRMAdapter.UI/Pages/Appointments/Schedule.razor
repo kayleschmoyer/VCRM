@@ -1,7 +1,7 @@
 @* Schedule.razor: Weekly calendar-inspired visualization of appointments with mobile-friendly layout. *@
 @page "/appointments/schedule"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
-@inject IAppointmentBook AppointmentBook
+@inject IAppointmentService AppointmentBook
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-appointments-schedule">
