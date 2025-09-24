@@ -11,6 +11,7 @@ Imports System
 Imports System.Collections.Generic
 Imports System.Data
 Imports System.Data.Common
+Imports System.Diagnostics
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports CRMAdapter.CommonConfig
@@ -125,7 +126,7 @@ Namespace CRMAdapter.Vast.Adapter
         ''' <summary>
         ''' Executes a database operation with retry, throttling, and safe exception wrapping.
         ''' </summary>
-        Protected Function ExecuteDbOperationAsync(Of TResult)(operationName As String, operation As Func(Of CancellationToken, Task(Of TResult)), cancellationToken As CancellationToken) As Task(Of TResult)
+        Protected Async Function ExecuteDbOperationAsync(Of TResult)(operationName As String, operation As Func(Of CancellationToken, Task(Of TResult)), cancellationToken As CancellationToken) As Task(Of TResult)
             If String.IsNullOrWhiteSpace(operationName) Then
                 Throw New ArgumentException("Operation name must be provided.", NameOf(operationName))
             End If
@@ -134,10 +135,49 @@ Namespace CRMAdapter.Vast.Adapter
                 Throw New ArgumentNullException(NameOf(operation))
             End If
 
-            Return RetryPolicy.ExecuteAsync(Function(ct) ExecuteCoreAsync(operationName, operation, ct), cancellationToken)
+            Using scope = AdapterCorrelationScope.BeginScope()
+                Dim baseContext As New Dictionary(Of String, Object) From
+                {
+                    {"Operation", operationName},
+                    {"Backend", BackendName},
+                    {"CorrelationId", scope.CorrelationId}
+                }
+
+                Dim stopwatch = Stopwatch.StartNew()
+                Logger.LogInformation("CRM query started.", baseContext)
+
+                Try
+                    Dim result = Await RetryPolicy.ExecuteAsync(Function(ct) ExecuteCoreAsync(operationName, operation, ct, baseContext, stopwatch), cancellationToken).ConfigureAwait(False)
+
+                    Dim completionContext = New Dictionary(Of String, Object)(baseContext)
+                    completionContext("DurationMs") = stopwatch.Elapsed.TotalMilliseconds
+                    Logger.LogInformation("CRM query completed.", completionContext)
+                    Return result
+                Catch ex As AdapterDataAccessException
+                    Throw
+                Finally
+                    If stopwatch.IsRunning Then
+                        stopwatch.Stop()
+                    End If
+                End Try
+            End Using
         End Function
 
-        Private Async Function ExecuteCoreAsync(Of TResult)(operationName As String, operation As Func(Of CancellationToken, Task(Of TResult)), cancellationToken As CancellationToken) As Task(Of TResult)
+        ''' <summary>
+        ''' Executes an operation that does not return a result.
+        ''' </summary>
+        Protected Async Function ExecuteDbOperationAsync(operationName As String, operation As Func(Of CancellationToken, Task), cancellationToken As CancellationToken) As Task
+            If operation Is Nothing Then
+                Throw New ArgumentNullException(NameOf(operation))
+            End If
+
+            Await ExecuteDbOperationAsync(Of Object)(operationName, Async Function(ct)
+                                                                                Await operation(ct).ConfigureAwait(False)
+                                                                                Return Nothing
+                                                                            End Function, cancellationToken).ConfigureAwait(False)
+        End Function
+
+        Private Async Function ExecuteCoreAsync(Of TResult)(operationName As String, operation As Func(Of CancellationToken, Task(Of TResult)), cancellationToken As CancellationToken, baseContext As IReadOnlyDictionary(Of String, Object), stopwatch As Stopwatch) As Task(Of TResult)
             Dim lease = Await RateLimiter.AcquireAsync(operationName, cancellationToken).ConfigureAwait(False)
             Using lease
                 Try
@@ -149,32 +189,13 @@ Namespace CRMAdapter.Vast.Adapter
                 Catch ex As OperationCanceledException
                     Throw
                 Catch ex As Exception
-                    Logger.LogError(
-                        "Adapter operation failed.",
-                        ex,
-                        New Dictionary(Of String, Object) From
-                        {
-                            {"Operation", operationName},
-                            {"Backend", BackendName},
-                            {"ExceptionType", ex.GetType().FullName}
-                        })
+                    Dim failureContext = New Dictionary(Of String, Object)(baseContext)
+                    failureContext("DurationMs") = stopwatch.Elapsed.TotalMilliseconds
+                    failureContext("ExceptionType") = ex.GetType().FullName
+                    Logger.LogError("CRM query failed.", ex, failureContext)
                     Throw New AdapterDataAccessException(operationName, BackendName, ex)
                 End Try
             End Using
-        End Function
-
-        ''' <summary>
-        ''' Executes an operation that does not return a result.
-        ''' </summary>
-        Protected Function ExecuteDbOperationAsync(operationName As String, operation As Func(Of CancellationToken, Task), cancellationToken As CancellationToken) As Task
-            If operation Is Nothing Then
-                Throw New ArgumentNullException(NameOf(operation))
-            End If
-
-            Return ExecuteDbOperationAsync(Of Object)(operationName, Async Function(ct)
-                                                                                Await operation(ct).ConfigureAwait(False)
-                                                                                Return Nothing
-                                                                            End Function, cancellationToken)
         End Function
 
         ''' <summary>

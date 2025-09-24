@@ -81,6 +81,12 @@ namespace CRMAdapter.Factory
     {
         private const string DesktopKey = "VAST_DESKTOP";
         private const string OnlineKey = "VAST_ONLINE";
+        private const string EventSourceEnvironmentVariable = "CRM_EVENT_SOURCE";
+        private const string EventLogEnvironmentVariable = "CRM_EVENT_LOG";
+        private const string AppInsightsConnectionStringVariable = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+        private const string AppInsightsInstrumentationKeyVariable = "APPINSIGHTS_INSTRUMENTATIONKEY";
+        private const string AppInsightsRoleVariable = "CRM_APPINSIGHTS_ROLE";
+        private const string DefaultTelemetryName = "CRMAdapter";
 
         /// <summary>
         /// Resolves adapter implementations based on environment variables.
@@ -126,6 +132,7 @@ namespace CRMAdapter.Factory
             var mappingFile = ResolveMappingPath(normalizedBackend, mappingPath);
             var fieldMap = FieldMap.LoadFromFile(mappingFile);
             var resolvedOptions = options ?? AdapterFactoryOptions.SecureDefaults();
+            EnsureLoggerForBackend(normalizedBackend, resolvedOptions);
 
             return normalizedBackend switch
             {
@@ -165,6 +172,7 @@ namespace CRMAdapter.Factory
             }
 
             var resolvedOptions = options ?? AdapterFactoryOptions.SecureDefaults();
+            EnsureLoggerForBackend(OnlineKey, resolvedOptions);
             var absoluteMappingPath = Path.GetFullPath(mappingPath);
             var fieldMap = FieldMap.LoadFromFile(absoluteMappingPath);
             services.AddSingleton(fieldMap);
@@ -254,6 +262,7 @@ namespace CRMAdapter.Factory
                 throw new ArgumentNullException(nameof(options));
             }
 
+            EnsureLoggerForBackend(DesktopKey, options);
             var createdAdapters = new List<IDisposable>();
             try
             {
@@ -306,6 +315,7 @@ namespace CRMAdapter.Factory
                 throw new ArgumentNullException(nameof(options));
             }
 
+            EnsureLoggerForBackend(OnlineKey, options);
             var createdAdapters = new List<IDisposable>();
             try
             {
@@ -371,6 +381,72 @@ namespace CRMAdapter.Factory
                 connection.Dispose();
                 throw;
             }
+        }
+
+        private static void EnsureLoggerForBackend(string backend, AdapterFactoryOptions options)
+        {
+            if (options is null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            if (!ReferenceEquals(options.Logger, NullAdapterLogger.Instance))
+            {
+                return;
+            }
+
+            IAdapterLogger? newLogger = backend switch
+            {
+                DesktopKey => AdapterLoggerFactory.CreateDesktopLogger(
+                    Environment.GetEnvironmentVariable(EventSourceEnvironmentVariable) ?? DefaultTelemetryName,
+                    Environment.GetEnvironmentVariable(EventLogEnvironmentVariable) ?? "Application"),
+                OnlineKey => CreateOnlineLogger(),
+                _ => null,
+            };
+
+            if (newLogger is null || ReferenceEquals(newLogger, NullAdapterLogger.Instance))
+            {
+                return;
+            }
+
+            options.Logger = newLogger;
+            if (options.RetryPolicy is ExponentialBackoffRetryPolicy retryPolicy)
+            {
+                options.RetryPolicy = new ExponentialBackoffRetryPolicy(
+                    retryPolicy.Options,
+                    retryPolicy.TransientErrorDetector,
+                    newLogger);
+            }
+        }
+
+        private static IAdapterLogger? CreateOnlineLogger()
+        {
+            var connectionString = ResolveApplicationInsightsConnectionString();
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return null;
+            }
+
+            var roleName = Environment.GetEnvironmentVariable(AppInsightsRoleVariable);
+            var resolvedRole = string.IsNullOrWhiteSpace(roleName) ? DefaultTelemetryName : roleName;
+            return AdapterLoggerFactory.CreateOnlineLogger(connectionString, resolvedRole);
+        }
+
+        private static string? ResolveApplicationInsightsConnectionString()
+        {
+            var connectionString = Environment.GetEnvironmentVariable(AppInsightsConnectionStringVariable);
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                return connectionString;
+            }
+
+            var instrumentationKey = Environment.GetEnvironmentVariable(AppInsightsInstrumentationKeyVariable);
+            if (!string.IsNullOrWhiteSpace(instrumentationKey))
+            {
+                return $"InstrumentationKey={instrumentationKey}";
+            }
+
+            return null;
         }
 
         private static string ResolveMappingPath(string backend, string? mappingPath)

@@ -74,54 +74,62 @@ Namespace CRMAdapter.Vast.Interop
         ''' Retrieves a customer and vehicles serialized as JSON for VB6 consumption.
         ''' </summary>
         Public Function GetCustomerByIdJson(id As String) As String
-            Try
-                Dim customerId = ParseGuid(id, NameOf(id))
-                Dim customer = _customerAdapter.GetByIdAsync(customerId).ConfigureAwait(False).GetAwaiter().GetResult()
-                If customer Is Nothing Then
-                    Throw New CustomerNotFoundException(customerId)
-                End If
-                Return Serialize(customer)
-            Catch ex As Exception
-                Throw CreateComException("CRM-CUSTOMER-ERROR", &H8004A100, ex)
-            End Try
+            Using AdapterCorrelationScope.BeginScope()
+                Try
+                    Dim customerId = ParseGuid(id, NameOf(id))
+                    Dim customer = _customerAdapter.GetByIdAsync(customerId).ConfigureAwait(False).GetAwaiter().GetResult()
+                    If customer Is Nothing Then
+                        Throw New CustomerNotFoundException(customerId)
+                    End If
+                    Return Serialize(customer)
+                Catch ex As Exception
+                    Throw CreateComException("CRM-CUSTOMER-ERROR", &H8004A100, ex)
+                End Try
+            End Using
         End Function
 
         ''' <summary>
         ''' Retrieves vehicles for a customer serialized to JSON.
         ''' </summary>
         Public Function GetVehiclesByCustomerJson(customerId As String) As String
-            Try
-                Dim idValue = ParseGuid(customerId, NameOf(customerId))
-                Dim vehicles = _vehicleAdapter.GetByCustomerAsync(idValue, 100).ConfigureAwait(False).GetAwaiter().GetResult()
-                Return Serialize(vehicles)
-            Catch ex As Exception
-                Throw CreateComException("CRM-VEHICLE-ERROR", &H8004A101, ex)
-            End Try
+            Using AdapterCorrelationScope.BeginScope()
+                Try
+                    Dim idValue = ParseGuid(customerId, NameOf(customerId))
+                    Dim vehicles = _vehicleAdapter.GetByCustomerAsync(idValue, 100).ConfigureAwait(False).GetAwaiter().GetResult()
+                    Return Serialize(vehicles)
+                Catch ex As Exception
+                    Throw CreateComException("CRM-VEHICLE-ERROR", &H8004A101, ex)
+                End Try
+            End Using
         End Function
 
         ''' <summary>
         ''' Retrieves invoices for a customer serialized to JSON.
         ''' </summary>
         Public Function GetInvoicesByCustomerJson(customerId As String) As String
-            Try
-                Dim idValue = ParseGuid(customerId, NameOf(customerId))
-                Dim invoices = _invoiceAdapter.GetByCustomerAsync(idValue, 100).ConfigureAwait(False).GetAwaiter().GetResult()
-                Return Serialize(invoices)
-            Catch ex As Exception
-                Throw CreateComException("CRM-INVOICE-ERROR", &H8004A102, ex)
-            End Try
+            Using AdapterCorrelationScope.BeginScope()
+                Try
+                    Dim idValue = ParseGuid(customerId, NameOf(customerId))
+                    Dim invoices = _invoiceAdapter.GetByCustomerAsync(idValue, 100).ConfigureAwait(False).GetAwaiter().GetResult()
+                    Return Serialize(invoices)
+                Catch ex As Exception
+                    Throw CreateComException("CRM-INVOICE-ERROR", &H8004A102, ex)
+                End Try
+            End Using
         End Function
 
         ''' <summary>
         ''' Retrieves appointments for a specific date serialized to JSON.
         ''' </summary>
         Public Function GetAppointmentsByDateJson([date] As Date) As String
-            Try
-                Dim appointments = _appointmentAdapter.GetByDateAsync([date], 100).ConfigureAwait(False).GetAwaiter().GetResult()
-                Return Serialize(appointments)
-            Catch ex As Exception
-                Throw CreateComException("CRM-APPOINTMENT-ERROR", &H8004A103, ex)
-            End Try
+            Using AdapterCorrelationScope.BeginScope()
+                Try
+                    Dim appointments = _appointmentAdapter.GetByDateAsync([date], 100).ConfigureAwait(False).GetAwaiter().GetResult()
+                    Return Serialize(appointments)
+                Catch ex As Exception
+                    Throw CreateComException("CRM-APPOINTMENT-ERROR", &H8004A103, ex)
+                End Try
+            End Using
         End Function
 
         Private Function CreateComException(messagePrefix As String, errorCode As Integer, ex As Exception) As COMException
