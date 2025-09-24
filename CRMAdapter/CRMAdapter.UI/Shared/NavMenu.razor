@@ -1,0 +1,65 @@
+@* NavMenu.razor: Delivers role-aware navigation with active state styling and mobile-friendly behavior. *@
+@inject NavigationManager NavigationManager
+@inject NavigationMenuService NavigationMenu
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+
+<MudNavMenu Class="crm-nav-menu" Dense="false" Elevation="0">
+    <MudText Typo="Typo.subtitle2" Class="crm-nav-heading" Role="heading" AriaLevel="2">Workspace Modules</MudText>
+    @foreach (var link in _links)
+    {
+        <MudNavLink Href="@link.Href"
+                    Icon="@link.Icon"
+                    Match="NavLinkMatch.Prefix"
+                    DisableRipple="true"
+                    Class="@GetLinkClass(link)"
+                    OnClick="() => HandleNavigationAsync(link)">
+            <div class="crm-nav-link-content">
+                <span class="crm-nav-link-title">@link.Title</span>
+                <span class="crm-nav-link-description">@link.Description</span>
+            </div>
+        </MudNavLink>
+    }
+</MudNavMenu>
+
+@code {
+    private IReadOnlyList<NavigationLink> _links = Array.Empty<NavigationLink>();
+
+    [Parameter]
+    public EventCallback OnNavigate { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationChanged;
+        await LoadLinksAsync();
+    }
+
+    private async Task LoadLinksAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _links = NavigationMenu.GetLinksForUser(state.User).ToList();
+        StateHasChanged();
+    }
+
+    private string GetLinkClass(NavigationLink link)
+    {
+        return NavigationMenu.IsActive(NavigationManager, link) ? "mud-nav-link-active" : string.Empty;
+    }
+
+    private async Task HandleNavigationAsync(NavigationLink link)
+    {
+        await OnNavigate.InvokeAsync();
+    }
+
+    private async void OnAuthenticationChanged(Task<AuthenticationState> task)
+    {
+        var state = await task;
+        _links = NavigationMenu.GetLinksForUser(state.User).ToList();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationChanged;
+    }
+}

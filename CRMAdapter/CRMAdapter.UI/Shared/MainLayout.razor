@@ -1,0 +1,85 @@
+@* MainLayout.razor: Crafts the responsive shell with navigation drawer, adaptive top bar, and content surface. *@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject AppThemeState ThemeState
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<MudLayout Class="crm-layout">
+    <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" Breakpoint="Breakpoint.Md" Immediate="true" />
+    <MudDrawer @bind-Open="_isDrawerOpen"
+               Variant="@_drawerVariant"
+               Elevation="1"
+               Class="crm-drawer"
+               OverlayOpacity="0.4"
+               DisableOverlay="@(_drawerVariant == DrawerVariant.Persistent)"
+               AriaLabel="Primary navigation">
+        <NavMenu OnNavigate="CloseDrawerOnMobile" />
+    </MudDrawer>
+
+    <MudMainContent>
+        <section class="crm-grid" aria-live="polite">
+            <header class="crm-topbar">
+                <TopBar OnToggleNavigation="ToggleDrawer" OnThemeToggle="ToggleTheme" OnSearch="HandleSearch" />
+            </header>
+            <main id="main-content" class="crm-content" tabindex="-1">
+                <MudPaper Class="crm-content-surface" Elevation="0">
+                    @Body
+                </MudPaper>
+            </main>
+        </section>
+    </MudMainContent>
+</MudLayout>
+
+<MudScrollToTop TopOffset="250" Icon="@Icons.Material.Filled.KeyboardArrowUp" />
+
+@code {
+    private bool _isDrawerOpen = true;
+    private DrawerVariant _drawerVariant = DrawerVariant.Persistent;
+
+    protected override void OnInitialized()
+    {
+        ThemeState.OnChange += OnThemeChanged;
+    }
+
+    private void ToggleDrawer() => _isDrawerOpen = !_isDrawerOpen;
+
+    private void ToggleTheme() => ThemeState.ToggleTheme();
+
+    private void HandleSearch(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            Snackbar.Add("Enter a search term to explore CRM insights.", Severity.Info);
+            return;
+        }
+
+        var destination = $"/search?query={Uri.EscapeDataString(query)}";
+        Navigation.NavigateTo(destination);
+    }
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _drawerVariant = breakpoint < Breakpoint.Md ? DrawerVariant.Temporary : DrawerVariant.Persistent;
+        if (_drawerVariant == DrawerVariant.Temporary)
+        {
+            _isDrawerOpen = false;
+        }
+        StateHasChanged();
+    }
+
+    private void CloseDrawerOnMobile()
+    {
+        if (_drawerVariant == DrawerVariant.Temporary)
+        {
+            _isDrawerOpen = false;
+        }
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        ThemeState.OnChange -= OnThemeChanged;
+    }
+}

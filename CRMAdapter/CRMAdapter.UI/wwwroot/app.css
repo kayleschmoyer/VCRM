@@ -1,0 +1,59 @@
+/* app.css: Establishes global typography, smooth transitions, and responsive helpers for CRM Adapter UI. */
+html, body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: "Inter", "Segoe UI", sans-serif;
+    background: linear-gradient(160deg, rgba(245, 247, 251, 1) 0%, rgba(236, 239, 249, 1) 100%);
+    color: #0f172a;
+    transition: background 0.4s ease;
+}
+
+body.mud-theme-dark {
+    background: radial-gradient(circle at 10% 20%, rgba(17, 28, 46, 1) 0%, rgba(12, 20, 36, 1) 100%);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+main:focus {
+    outline: 3px solid rgba(54, 97, 255, 0.6);
+    outline-offset: 4px;
+}
+
+.landing-grid {
+    margin-top: 0.5rem;
+}
+
+.landing-hero {
+    padding: 2.5rem;
+    border-radius: 20px;
+    background: linear-gradient(120deg, rgba(54, 97, 255, 0.15) 0%, rgba(228, 80, 160, 0.15) 100%);
+    backdrop-filter: blur(16px);
+}
+
+body.mud-theme-dark .landing-hero {
+    background: linear-gradient(120deg, rgba(124, 161, 255, 0.25) 0%, rgba(244, 143, 177, 0.22) 100%);
+}
+
+.landing-kpi {
+    padding: 1.75rem;
+    border-radius: 18px;
+}
+
+.mud-list-item-text-primary {
+    font-weight: 600;
+}
+
+.mud-chip.crm-correlation-chip {
+    font-size: 0.75rem;
+}

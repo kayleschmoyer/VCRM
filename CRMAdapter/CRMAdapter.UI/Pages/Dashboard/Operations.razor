@@ -1,0 +1,52 @@
+@* Operations.razor: Protected workspace for operations leaders to review fulfillment health. *@
+@page "/operations"
+@attribute [Authorize(Roles="Admin,Manager,Clerk")]
+
+<MudGrid Spacing="3">
+    <MudItem Xs="12">
+        <MudText Typo="Typo.h4" Class="mb-1">Operations command center</MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">Track inventory risk, fulfillment throughput, and proactive escalations. Access is restricted to the operations leadership team.</MudText>
+    </MudItem>
+    <MudItem Xs="12" Md="6">
+        <MudPaper Elevation="1" Class="pa-4" role="region" aria-label="Fulfillment velocity">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Fulfillment velocity</MudText>
+            <MudChart ChartType="ChartType.Line" XAxisLabels="@(new[] { "Mon", "Tue", "Wed", "Thu", "Fri" })" Lines="@_velocity" />
+        </MudPaper>
+    </MudItem>
+    <MudItem Xs="12" Md="6">
+        <MudPaper Elevation="1" Class="pa-4" role="region" aria-label="Critical blockers">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Critical blockers</MudText>
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Color="Color.Warning" Size="Size.Medium" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Carrier outage</MudText>
+                        <MudText Typo="Typo.caption">North-east hub delays 6 hours</MudText>
+                    </MudStack>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.BuildCircle" Color="Color.Info" Size="Size.Medium" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Production line retool</MudText>
+                        <MudText Typo="Typo.caption">Line 4 running at 64% capacity</MudText>
+                    </MudStack>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Size="Size.Medium" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Quality hold cleared</MudText>
+                        <MudText Typo="Typo.caption">3 SKUs released</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly ChartSeries[] _velocity =
+    {
+        new() { Name = "Orders shipped", Data = new double[] { 420, 460, 510, 560, 610 } },
+        new() { Name = "Orders committed", Data = new double[] { 400, 450, 495, 545, 600 } }
+    };
+}

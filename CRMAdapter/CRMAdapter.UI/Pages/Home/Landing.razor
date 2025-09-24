@@ -1,0 +1,43 @@
+@* Landing.razor: Entry dashboard summarizing CRMAdapter insights and quick actions. *@
+@page "/"
+
+<MudGrid Class="landing-grid" Spacing="3">
+    <MudItem Xs="12" Md="8">
+        <MudPaper Elevation="1" Class="landing-hero" role="region" aria-label="Executive overview">
+            <MudText Typo="Typo.h3" Class="mb-2">Command your customer universe</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">Orchestrate revenue, service, and operations from a single, intelligence-driven workspace. Tailored views keep every leader aligned in real time.</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/operations">Go to operations</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/support">View support desk</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem Xs="12" Md="4">
+        <MudPaper Elevation="1" Class="landing-kpi" role="region" aria-label="Key metrics">
+            <MudText Typo="Typo.subtitle1" Class="mb-3">Live signals</MudText>
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Medium" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Pipeline health</MudText>
+                        <MudText Typo="Typo.caption">106% to quarterly target</MudText>
+                    </MudStack>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Color="Color.Info" Size="Size.Medium" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Open support cases</MudText>
+                        <MudText Typo="Typo.caption">18 priority tickets</MudText>
+                    </MudStack>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Warning" Size="Size.Medium" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Orders at risk</MudText>
+                        <MudText Typo="Typo.caption">5 orders require escalation</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
