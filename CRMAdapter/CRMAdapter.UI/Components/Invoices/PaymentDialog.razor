@@ -1,0 +1,119 @@
+@* PaymentDialog.razor: Guided modal for capturing payments with validation and contextual defaults. *@
+<MudDialog Class="crm-payment-dialog">
+    <DialogContent>
+        <MudStack Spacing="1.5">
+            <MudText Typo="Typo.h6">Record payment</MudText>
+            <MudForm @ref="_form">
+                <MudStack Spacing="1.5">
+                    <MudNumericField T="decimal"
+                                     @bind-Value="_amount"
+                                     Label="Amount"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="$"
+                                     Immediate="true"
+                                     Min="0"
+                                     Required="true"
+                                     InputType="InputType.Number"
+                                     Class="crm-payment-dialog-field"
+                                     InputAttributes="@_amountAttributes" />
+
+                    <MudSelect @bind-Value="_method"
+                               Label="Method"
+                               Variant="Variant.Outlined"
+                               Required="true"
+                               Class="crm-payment-dialog-field"
+                               InputAttributes="@_methodAttributes">
+                        @foreach (var option in _methods)
+                        {
+                            <MudSelectItem Value="@option">@option</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudDatePicker @bind-Date="_paidOn"
+                                    Label="Payment date"
+                                    Variant="Variant.Outlined"
+                                    Required="true"
+                                    Class="crm-payment-dialog-field"
+                                    InputIcon="@Icons.Material.Filled.Event"
+                                    DateFormat="MMM dd, yyyy"
+                                    PickerVariant="PickerVariant.Inline"
+                                    InputAttributes="@_dateAttributes" />
+
+                    <MudTextField @bind-Value="_notes"
+                                  Label="Notes"
+                                  Variant="Variant.Outlined"
+                                  Lines="3"
+                                  Class="crm-payment-dialog-field"
+                                  Placeholder="Internal memo for finance"
+                                  InputAttributes="@_notesAttributes" />
+                </MudStack>
+            </MudForm>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Close" Disabled="@_isProcessing">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="HandleSubmitAsync"
+                   Disabled="@_isProcessing"
+                   data-testid="record-payment-submit">
+            Record payment
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly Dictionary<string, object?> _amountAttributes = new() { { "data-testid", "payment-amount" } };
+    private readonly Dictionary<string, object?> _methodAttributes = new() { { "data-testid", "payment-method" } };
+    private readonly Dictionary<string, object?> _dateAttributes = new() { { "data-testid", "payment-date" } };
+    private readonly Dictionary<string, object?> _notesAttributes = new() { { "data-testid", "payment-notes" } };
+    private readonly IReadOnlyList<string> _methods = new[] { "Cash", "Credit", "ACH", "Other" };
+
+    private MudForm? _form;
+    private decimal _amount;
+    private string _method = "ACH";
+    private DateTime? _paidOn;
+    private string? _notes;
+    private bool _isProcessing;
+
+    [CascadingParameter]
+    public MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public decimal BalanceDue { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (_amount <= 0 && BalanceDue > 0)
+        {
+            _amount = Math.Round(BalanceDue, 2);
+        }
+
+        _paidOn ??= DateTime.UtcNow.Date;
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        if (_form is null)
+        {
+            return;
+        }
+
+        await _form.Validate();
+        if (!_form.IsValid || !_paidOn.HasValue)
+        {
+            return;
+        }
+
+        _isProcessing = true;
+
+        var entry = new PaymentEntry(Math.Round(_amount, 2), _method, _paidOn.Value, string.IsNullOrWhiteSpace(_notes) ? null : _notes!.Trim());
+        MudDialog.Close(DialogResult.Ok(entry));
+    }
+
+    private void Close()
+    {
+        MudDialog.Cancel();
+    }
+}

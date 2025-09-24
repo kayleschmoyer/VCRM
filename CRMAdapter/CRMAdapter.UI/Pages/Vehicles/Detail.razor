@@ -2,6 +2,7 @@
 @page "/vehicles/{VehicleId:guid}"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
 @inject IVehicleRegistry VehicleRegistry
+@inject IInvoiceWorkspace InvoiceWorkspace
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-vehicle-detail">
@@ -68,10 +69,43 @@
                 <MudPaper Elevation="1" Class="crm-detail-tabs">
                     <MudTabs Rounded="true" ApplyEffects="true" KeepPanelsAlive="true">
                         <MudTabPanel Text="Invoices" Icon="@Icons.Material.Filled.ReceiptLong">
-                            <HistoryTable Items="@InvoiceEntries"
-                                          PrimaryLabel="Invoice"
-                                          SecondaryLabel="Date"
-                                          TertiaryLabel="Amount" />
+                            <MudTable Items="@_vehicleInvoices"
+                                      Dense="true"
+                                      Hover="true"
+                                      Breakpoint="Breakpoint.Sm"
+                                      OnRowClick="NavigateToInvoice"
+                                      RowClassFunc="@(_ => \"crm-invoice-row\")">
+                                <HeaderContent>
+                                    <MudTh>Invoice</MudTh>
+                                    <MudTh>Date</MudTh>
+                                    <MudTh>Total</MudTh>
+                                    <MudTh>Balance</MudTh>
+                                    <MudTh>Status</MudTh>
+                                    <MudTh class="text-right">Actions</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Invoice">
+                                        <MudText Typo="Typo.subtitle2">@context.InvoiceNumber</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Date">@context.IssuedOn.ToString("MMM dd, yyyy")</MudTd>
+                                    <MudTd DataLabel="Total">@FormatCurrency(context.Total)</MudTd>
+                                    <MudTd DataLabel="Balance">
+                                        <MudText Typo="Typo.subtitle2" Color="@(context.BalanceDue > 0 ? Color.Error : Color.Default)">
+                                            @FormatCurrency(context.BalanceDue)
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <StatusChip Status="@context.Status" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Actions" Class="text-right">
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => NavigateToInvoice(context.Id))">
+                                            View
+                                        </MudButton>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
                         </MudTabPanel>
                         <MudTabPanel Text="Appointments" Icon="@Icons.Material.Filled.EventAvailable">
                             <HistoryTable Items="@AppointmentEntries"
@@ -91,18 +125,8 @@
     public Guid VehicleId { get; set; }
 
     private VehicleDetail? _vehicle;
+    private List<InvoiceSummary> _vehicleInvoices = new();
     private bool _isLoading;
-
-    private IReadOnlyList<HistoryEntry> InvoiceEntries => _vehicle?.Invoices
-        .OrderByDescending(invoice => invoice.IssuedOn)
-        .Select(invoice => new HistoryEntry(
-            invoice.InvoiceNumber,
-            invoice.IssuedOn.ToString("MMM dd, yyyy"),
-            FormatCurrency(invoice.Amount),
-            null,
-            invoice.Status,
-            StatusColorCatalog.Resolve(invoice.Status)))
-        .ToList() ?? Array.Empty<HistoryEntry>();
 
     private IReadOnlyList<HistoryEntry> AppointmentEntries => _vehicle?.Appointments
         .OrderBy(a => a.ScheduledFor)
@@ -119,6 +143,9 @@
     {
         _isLoading = true;
         _vehicle = await VehicleRegistry.GetVehicleAsync(VehicleId);
+        _vehicleInvoices = _vehicle is null
+            ? new List<InvoiceSummary>()
+            : (await InvoiceWorkspace.GetInvoicesForVehicleAsync(_vehicle.Id)).ToList();
         _isLoading = false;
     }
 
@@ -130,6 +157,16 @@
     private string GetCustomerUrl(Guid customerId)
     {
         return $"/customers/{customerId}";
+    }
+
+    private void NavigateToInvoice(TableRowClickEventArgs<InvoiceSummary> args)
+    {
+        NavigationManager.NavigateTo($"/invoices/{args.Item.Id}");
+    }
+
+    private void NavigateToInvoice(Guid invoiceId)
+    {
+        NavigationManager.NavigateTo($"/invoices/{invoiceId}");
     }
 
     private static string FormatCurrency(decimal amount)

@@ -1,0 +1,21 @@
+/* InvoiceCard.razor.css: Shapes the compact invoice summary aesthetic across mobile and detail surfaces. */
+.crm-invoice-card {
+    border-radius: 18px;
+    transition: box-shadow 200ms ease;
+}
+
+.crm-invoice-card:hover {
+    box-shadow: var(--mud-elevation-6);
+}
+
+.crm-invoice-card-number {
+    letter-spacing: 0.05em;
+}
+
+.crm-invoice-balance--due {
+    color: var(--mud-palette-error);
+}
+
+.crm-invoice-status-chip {
+    font-weight: 600;
+}

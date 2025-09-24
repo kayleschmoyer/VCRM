@@ -1,0 +1,247 @@
+@* List.razor: Financial control tower showcasing invoices with deep filtering and cross-navigation. *@
+@page "/invoices"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
+@inject IInvoiceWorkspace InvoiceWorkspace
+@inject NavigationManager NavigationManager
+
+<MudStack Spacing="3" Class="crm-invoices-container">
+    <MudStack Spacing="0.5">
+        <MudText Typo="Typo.h4" Class="crm-page-title">Invoice command center</MudText>
+        <MudText Typo="Typo.body1" Class="crm-page-subtitle">Track receivables, resolve balance risk, and keep customers confident.</MudText>
+    </MudStack>
+
+    <MudPaper Elevation="1" Class="crm-search-shell" Square="false">
+        <MudTextField @bind-Value="_search"
+                      Label="Search invoices"
+                      Variant="Variant.Outlined"
+                      Placeholder="Invoice #, customer, or VIN"
+                      Immediate="true"
+                      DebounceInterval="220"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      OnImmediateValueChanged="HandleSearch"
+                      Class="crm-invoice-search" />
+        <MudChip Variant="Variant.Outlined" Color="Color.Primary" Class="crm-result-count" Icon="@Icons.Material.Filled.ReceiptLong">
+            @_filteredInvoices.Count invoices
+        </MudChip>
+    </MudPaper>
+
+    <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudPaper Elevation="1" Class="crm-table-shell">
+            <MudTable Items="@_filteredInvoices"
+                      Loading="@_isLoading"
+                      Hover="true"
+                      Bordered="false"
+                      Dense="false"
+                      RowsPerPage="@_rowsPerPage"
+                      RowsPerPageOptions="@_rowsPerPageOptions"
+                      Breakpoint="Breakpoint.Sm"
+                      @ref="_table"
+                      RowClassFunc="ResolveRowClass"
+                      OnRowClick="HandleRowClick">
+                <ToolBarContent>
+                    <MudText Typo="Typo.subtitle1">Invoices</MudText>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.InvoiceNumber)">
+                            Invoice #
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.CustomerName)">
+                            Customer
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.VehicleVin)">
+                            Vehicle
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="@(_ => _.IssuedOn)" InitialDirection="SortDirection.Descending">
+                            Date
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh class="text-right">
+                        <MudTableSortLabel SortBy="@(_ => _.Total)">
+                            Total
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh class="text-right">
+                        <MudTableSortLabel SortBy="@(_ => _.BalanceDue)">
+                            Balance
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh class="text-right">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Invoice #">
+                        <MudStack Spacing="0.25">
+                            <MudText Typo="Typo.subtitle2">@context.InvoiceNumber</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">@context.IssuedOn.ToString("MMM dd, yyyy")</MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Customer">
+                        <MudLink Href="@GetCustomerUrl(context.CustomerId)" Color="Color.Primary">@context.CustomerName</MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Vehicle">
+                        <MudStack Spacing="0.25">
+                            <MudText Typo="Typo.subtitle2">@context.VehicleVin</MudText>
+                            <MudLink Href="@GetVehicleUrl(context.VehicleId)" Color="Color.Primary" Typo="Typo.caption">View vehicle</MudLink>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Date">@context.IssuedOn.ToString("MMM dd, yyyy")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <StatusChip Status="@context.Status" />
+                    </MudTd>
+                    <MudTd DataLabel="Total" Class="text-right">@FormatCurrency(context.Total)</MudTd>
+                    <MudTd DataLabel="Balance" Class="text-right">
+                        <MudText Typo="Typo.subtitle2" Class="@(context.BalanceDue > 0 ? "crm-balance-danger" : string.Empty)">
+                            @FormatCurrency(context.BalanceDue)
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions" Class="text-right">
+                        <MudTooltip Text="View invoice">
+                            <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           aria-label="View invoice"
+                                           OnClick="@(() => NavigateToDetail(context.Id))" />
+                        </MudTooltip>
+                        <MudTooltip Text="Email invoice (coming soon)">
+                            <MudIconButton Icon="@Icons.Material.Filled.MarkEmailRead"
+                                           Color="Color.Secondary"
+                                           Size="Size.Small"
+                                           aria-label="Email invoice"
+                                           Disabled="true" />
+                        </MudTooltip>
+                        <MudTooltip Text="Download PDF (coming soon)">
+                            <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf"
+                                           Color="Color.Secondary"
+                                           Size="Size.Small"
+                                           aria-label="Download invoice"
+                                           Disabled="true" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-6">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Secondary" Size="Size.Large" />
+                        <MudText Typo="Typo.subtitle1">No invoices match that search</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-secondary-text">Try another invoice number, customer, or VIN.</MudText>
+                    </MudStack>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudHidden>
+
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <MudStack Spacing="2">
+            @if (_isLoading)
+            {
+                <MudPaper Elevation="1" Class="pa-4 text-center">
+                    <MudProgressCircular Indeterminate="true" />
+                </MudPaper>
+            }
+            else if (_filteredInvoices.Count == 0)
+            {
+                <MudPaper Elevation="1" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Secondary" Size="Size.Large" />
+                    <MudText Typo="Typo.subtitle1">No invoices match that search</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                @foreach (var invoice in _filteredInvoices)
+                {
+                    <InvoiceCard InvoiceNumber="@invoice.InvoiceNumber"
+                                 IssuedOn="@invoice.IssuedOn"
+                                 Status="@invoice.Status"
+                                 Total="@invoice.Total"
+                                 BalanceDue="@invoice.BalanceDue"
+                                 CustomerName="@invoice.CustomerName"
+                                 CustomerHref="@GetCustomerUrl(invoice.CustomerId)"
+                                 VehicleDescription="@($"VIN {invoice.VehicleVin}")"
+                                 VehicleVin="@invoice.VehicleVin"
+                                 VehicleHref="@GetVehicleUrl(invoice.VehicleId)">
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   OnClick="@(() => NavigateToDetail(invoice.Id))">
+                            View details
+                        </MudButton>
+                    </InvoiceCard>
+                }
+            }
+        </MudStack>
+    </MudHidden>
+</MudStack>
+
+@code {
+    private readonly int[] _rowsPerPageOptions = { 10, 25, 50 };
+    private IReadOnlyList<InvoiceSummary> _allInvoices = Array.Empty<InvoiceSummary>();
+    private List<InvoiceSummary> _filteredInvoices = new();
+    private MudTable<InvoiceSummary>? _table;
+    private int _rowsPerPage = 10;
+    private bool _isLoading;
+    private string _search = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        _allInvoices = await InvoiceWorkspace.GetInvoicesAsync();
+        _filteredInvoices = _allInvoices.ToList();
+        _isLoading = false;
+    }
+
+    private async Task HandleSearch(string value)
+    {
+        _search = value ?? string.Empty;
+        var sanitized = _search.Trim();
+        _filteredInvoices = string.IsNullOrWhiteSpace(sanitized)
+            ? _allInvoices.ToList()
+            : _allInvoices.Where(invoice => Matches(invoice, sanitized)).ToList();
+
+        _table?.SetPage(0);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static bool Matches(InvoiceSummary invoice, string query)
+    {
+        return invoice.InvoiceNumber.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || invoice.CustomerName.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || invoice.VehicleVin.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ResolveRowClass(InvoiceSummary invoice)
+    {
+        var classes = new List<string> { "crm-invoice-row" };
+        if (string.Equals(invoice.Status, "Overdue", StringComparison.OrdinalIgnoreCase) && invoice.BalanceDue > 0)
+        {
+            classes.Add("crm-invoice-row--overdue");
+        }
+
+        return string.Join(' ', classes);
+    }
+
+    private void HandleRowClick(TableRowClickEventArgs<InvoiceSummary> args)
+    {
+        NavigateToDetail(args.Item.Id);
+    }
+
+    private void NavigateToDetail(Guid id)
+    {
+        NavigationManager.NavigateTo($"/invoices/{id}");
+    }
+
+    private string GetCustomerUrl(Guid customerId) => $"/customers/{customerId}";
+
+    private string GetVehicleUrl(Guid vehicleId) => $"/vehicles/{vehicleId}";
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+}

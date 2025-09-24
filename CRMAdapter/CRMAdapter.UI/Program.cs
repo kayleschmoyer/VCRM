@@ -6,6 +6,7 @@ using CRMAdapter.UI.Infrastructure.Security;
 using CRMAdapter.UI.Navigation;
 using CRMAdapter.UI.Services.Customers;
 using CRMAdapter.UI.Services.Diagnostics;
+using CRMAdapter.UI.Services.Invoices;
 using CRMAdapter.UI.Services.Vehicles;
 using CRMAdapter.UI.Theming;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -74,6 +75,7 @@ builder.Services.AddScoped<AppThemeState>();
 builder.Services.AddScoped<CorrelationContext>();
 builder.Services.AddSingleton<ICustomerDirectory, InMemoryCustomerDirectory>();
 builder.Services.AddSingleton<IVehicleRegistry, InMemoryVehicleRegistry>();
+builder.Services.AddSingleton<IInvoiceWorkspace, InMemoryInvoiceWorkspace>();
 
 builder.Services.AddHttpClient(HttpClientNames.CrmApi, client =>
     {

@@ -1,0 +1,23 @@
+/* List.razor.css: Elevates the invoice workspace with high-contrast states and mobile-first layout tweaks. */
+.crm-invoices-container {
+    padding-bottom: 2rem;
+}
+
+.crm-invoice-search {
+    min-width: 16rem;
+}
+
+.crm-invoice-row--overdue td {
+    color: var(--mud-palette-error);
+    font-weight: 600;
+}
+
+.crm-invoice-row--overdue {
+    background-color: rgba(211, 47, 47, 0.08);
+}
+
+.crm-balance-danger {
+    color: var(--mud-palette-error);
+    font-weight: 600;
+}
+

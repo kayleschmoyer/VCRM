@@ -15,6 +15,7 @@ public sealed class NavigationMenuService
     {
         new("Command Center", Icons.Material.Filled.DashboardCustomize, "/", "Executive overview with actionable KPIs.", RolePolicies.AllRoles),
         new("Customers", Icons.Material.Filled.PeopleAlt, "/customers", "360° customer directory and relationship insights.", RolePolicies.AllRoles),
+        new("Invoices", Icons.Material.Filled.ReceiptLong, "/invoices", "Billing performance, balances, and payment activity.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
         new("Vehicles", Icons.Material.Filled.DirectionsCar, "/vehicles", "Unified fleet management and service visibility.", RolePolicies.AllRoles),
         new("Operations", Icons.Material.Filled.PrecisionManufacturing, "/operations", "Order orchestration and fulfillment visibility.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
         new("Field Service", Icons.Material.Filled.HomeRepairService, "/field-service", "Technician dispatching and status intelligence.", new[] { RolePolicies.Tech, RolePolicies.Manager }),
