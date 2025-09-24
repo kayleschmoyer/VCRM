@@ -1,17 +1,21 @@
 '-----------------------------------------------------------------------
 ' File: SqlAdapterBase.vb
-' Role: Provides shared SQL helper functionality for VAST Desktop adapters.
-' Architectural Purpose: Centralizes async connection management and parameter handling for legacy SQL Server.
+' Purpose: Provides shared SQL helper functionality for VAST Desktop adapters.
+' Security Considerations: Applies retry and rate limiting policies, sanitizes command construction, and wraps exceptions to prevent leaking sensitive backend data.
+' Example Usage: `Await ExecuteDbOperationAsync("CustomerAdapter.GetById", Function(ct) command.ExecuteReaderAsync(ct), token)`
 '-----------------------------------------------------------------------
 Option Strict On
 Option Explicit On
 
 Imports System
+Imports System.Collections.Generic
 Imports System.Data
 Imports System.Data.Common
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports CRMAdapter.CommonConfig
+Imports CRMAdapter.CommonContracts
+Imports CRMAdapter.CommonInfrastructure
 
 Namespace CRMAdapter.Vast.Adapter
     ''' <summary>
@@ -28,7 +32,10 @@ Namespace CRMAdapter.Vast.Adapter
         ''' </summary>
         ''' <param name="connection">Database connection.</param>
         ''' <param name="fieldMap">Field map configuration.</param>
-        Protected Sub New(connection As DbConnection, fieldMap As FieldMap)
+        ''' <param name="retryPolicy">Retry policy implementation.</param>
+        ''' <param name="logger">Structured logger.</param>
+        ''' <param name="rateLimiter">Rate limiter implementation.</param>
+        Protected Sub New(connection As DbConnection, fieldMap As FieldMap, Optional retryPolicy As ISqlRetryPolicy = Nothing, Optional logger As IAdapterLogger = Nothing, Optional rateLimiter As IAdapterRateLimiter = Nothing)
             If connection Is Nothing Then
                 Throw New ArgumentNullException(NameOf(connection))
             End If
@@ -39,6 +46,9 @@ Namespace CRMAdapter.Vast.Adapter
 
             Me.Connection = connection
             Me.FieldMap = fieldMap
+            Me.Logger = If(logger, NullAdapterLogger.Instance)
+            Me.RateLimiter = If(rateLimiter, NoopAdapterRateLimiter.Instance)
+            Me.RetryPolicy = If(retryPolicy, New ExponentialBackoffRetryPolicy(logger:=Me.Logger))
         End Sub
 
         ''' <summary>
@@ -52,11 +62,35 @@ Namespace CRMAdapter.Vast.Adapter
         Protected ReadOnly Property FieldMap As FieldMap
 
         ''' <summary>
+        ''' Gets the retry policy for SQL operations.
+        ''' </summary>
+        Protected ReadOnly Property RetryPolicy As ISqlRetryPolicy
+
+        ''' <summary>
+        ''' Gets the adapter logger.
+        ''' </summary>
+        Protected ReadOnly Property Logger As IAdapterLogger
+
+        ''' <summary>
+        ''' Gets the rate limiter used for throttling.
+        ''' </summary>
+        Protected ReadOnly Property RateLimiter As IAdapterRateLimiter
+
+        ''' <summary>
+        ''' Gets the backend name.
+        ''' </summary>
+        Protected ReadOnly Property BackendName As String
+            Get
+                Return FieldMap.BackendName
+            End Get
+        End Property
+
+        ''' <summary>
         ''' Creates a command ensuring the connection is open.
         ''' </summary>
         Protected Async Function CreateCommandAsync(commandText As String, cancellationToken As CancellationToken) As Task(Of DbCommand)
-            If commandText Is Nothing Then
-                Throw New ArgumentNullException(NameOf(commandText))
+            If String.IsNullOrWhiteSpace(commandText) Then
+                Throw New ArgumentException("Command text must be provided.", NameOf(commandText))
             End If
 
             Await EnsureConnectionAsync(cancellationToken).ConfigureAwait(False)
@@ -74,8 +108,8 @@ Namespace CRMAdapter.Vast.Adapter
                 Throw New ArgumentNullException(NameOf(command))
             End If
 
-            If name Is Nothing Then
-                Throw New ArgumentNullException(NameOf(name))
+            If String.IsNullOrWhiteSpace(name) Then
+                Throw New ArgumentException("Parameter name must be provided.", NameOf(name))
             End If
 
             Dim parameter = command.CreateParameter()
@@ -88,6 +122,83 @@ Namespace CRMAdapter.Vast.Adapter
             command.Parameters.Add(parameter)
         End Sub
 
+        ''' <summary>
+        ''' Executes a database operation with retry, throttling, and safe exception wrapping.
+        ''' </summary>
+        Protected Function ExecuteDbOperationAsync(Of TResult)(operationName As String, operation As Func(Of CancellationToken, Task(Of TResult)), cancellationToken As CancellationToken) As Task(Of TResult)
+            If String.IsNullOrWhiteSpace(operationName) Then
+                Throw New ArgumentException("Operation name must be provided.", NameOf(operationName))
+            End If
+
+            If operation Is Nothing Then
+                Throw New ArgumentNullException(NameOf(operation))
+            End If
+
+            Return RetryPolicy.ExecuteAsync(Function(ct) ExecuteCoreAsync(operationName, operation, ct), cancellationToken)
+        End Function
+
+        Private Async Function ExecuteCoreAsync(Of TResult)(operationName As String, operation As Func(Of CancellationToken, Task(Of TResult)), cancellationToken As CancellationToken) As Task(Of TResult)
+            Dim lease = Await RateLimiter.AcquireAsync(operationName, cancellationToken).ConfigureAwait(False)
+            Using lease
+                Try
+                    Return Await operation(cancellationToken).ConfigureAwait(False)
+                Catch ex As AdapterException
+                    Throw
+                Catch ex As MappingConfigurationException
+                    Throw
+                Catch ex As OperationCanceledException
+                    Throw
+                Catch ex As Exception
+                    Logger.LogError(
+                        "Adapter operation failed.",
+                        ex,
+                        New Dictionary(Of String, Object) From
+                        {
+                            {"Operation", operationName},
+                            {"Backend", BackendName},
+                            {"ExceptionType", ex.GetType().FullName}
+                        })
+                    Throw New AdapterDataAccessException(operationName, BackendName, ex)
+                End Try
+            End Using
+        End Function
+
+        ''' <summary>
+        ''' Executes an operation that does not return a result.
+        ''' </summary>
+        Protected Function ExecuteDbOperationAsync(operationName As String, operation As Func(Of CancellationToken, Task), cancellationToken As CancellationToken) As Task
+            If operation Is Nothing Then
+                Throw New ArgumentNullException(NameOf(operation))
+            End If
+
+            Return ExecuteDbOperationAsync(Of Object)(operationName, Async Function(ct)
+                                                                                Await operation(ct).ConfigureAwait(False)
+                                                                                Return Nothing
+                                                                            End Function, cancellationToken)
+        End Function
+
+        ''' <summary>
+        ''' Applies safe bounds to requested limits.
+        ''' </summary>
+        Protected Shared Function EnforceLimit(requested As Integer, defaultLimit As Integer, parameterName As String) As Integer
+            If String.IsNullOrWhiteSpace(parameterName) Then
+                Throw New ArgumentException("Parameter name must be provided.", NameOf(parameterName))
+            End If
+
+            If defaultLimit <= 0 Then
+                Throw New ArgumentOutOfRangeException(NameOf(defaultLimit))
+            End If
+
+            If requested <= 0 Then
+                Return defaultLimit
+            End If
+
+            If requested > defaultLimit Then
+                Throw New InvalidAdapterRequestException(String.Format("{0} cannot exceed {1}.", parameterName, defaultLimit))
+            End If
+
+            Return requested
+        End Function
 
         ''' <summary>
         ''' Disposes the adapter and underlying connection.
@@ -108,6 +219,7 @@ Namespace CRMAdapter.Vast.Adapter
 
             If disposing Then
                 Connection.Dispose()
+                _connectionLock.Dispose()
             End If
 
             _disposed = True

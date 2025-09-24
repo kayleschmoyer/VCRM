@@ -1,5 +1,6 @@
 {
   "backendName": "VAST Desktop",
+  "schemaVersion": "1.0",
   "mappings": {
     "Customer": {
       "__source": "[dbo].[CUSTOMER]",

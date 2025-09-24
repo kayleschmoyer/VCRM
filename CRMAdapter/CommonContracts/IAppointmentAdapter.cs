@@ -1,7 +1,8 @@
 /*
  * File: IAppointmentAdapter.cs
- * Role: Declares canonical appointment operations for backend adapters.
- * Architectural Purpose: Ensures scheduling logic interacts with a unified appointment model.
+ * Purpose: Declares canonical appointment operations for backend adapters.
+ * Security Considerations: Enforces sanitized date-range queries and supports throttling through the rate limiting abstraction.
+ * Example Usage: `var appointments = await adapter.GetByDateAsync(DateTime.UtcNow.Date, 100, cancellationToken);`
  */
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace CRMAdapter.CommonContracts
         /// <param name="id">Canonical appointment identifier.</param>
         /// <param name="cancellationToken">Token used to cancel the request.</param>
         /// <returns>The appointment when found; otherwise, <c>null</c>.</returns>
+        /// <exception cref="InvalidAdapterRequestException">Thrown when the identifier is invalid.</exception>
         Task<Appointment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -31,6 +33,7 @@ namespace CRMAdapter.CommonContracts
         /// <param name="maxResults">Maximum results to return.</param>
         /// <param name="cancellationToken">Token used to cancel the request.</param>
         /// <returns>Collection of appointments.</returns>
+        /// <exception cref="InvalidAdapterRequestException">Thrown when the request is invalid.</exception>
         Task<IReadOnlyCollection<Appointment>> GetByDateAsync(
             DateTime date,
             int maxResults,

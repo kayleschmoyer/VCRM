@@ -1,10 +1,13 @@
 /*
  * File: Invoice.cs
- * Role: Provides the canonical representation for service invoices across CRM backends.
- * Architectural Purpose: Enables consistent billing analytics and reporting by abstracting source schema differences.
+ * Purpose: Provides the canonical representation for service invoices across CRM backends.
+ * Security Considerations: Guards against negative monetary values, enforces identifier validation, and clones line items to maintain immutability.
+ * Example Usage: `var invoice = new Invoice(id, customerId, vehicleId, "INV-1001", DateTime.UtcNow, 199.99m, "Paid", lines);`
  */
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace CRMAdapter.CommonDomain
 {
@@ -13,6 +16,9 @@ namespace CRMAdapter.CommonDomain
     /// </summary>
     public sealed class Invoice
     {
+        private const int MaxInvoiceNumberLength = 64;
+        private const int MaxStatusLength = 32;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Invoice"/> class.
         /// </summary>
@@ -34,14 +40,34 @@ namespace CRMAdapter.CommonDomain
             string status,
             IReadOnlyCollection<InvoiceLine> lineItems)
         {
+            if (id == Guid.Empty)
+            {
+                throw new ArgumentException("Invoice id must be non-empty.", nameof(id));
+            }
+
+            if (customerId == Guid.Empty)
+            {
+                throw new ArgumentException("Customer id must be non-empty.", nameof(customerId));
+            }
+
+            if (vehicleId == Guid.Empty)
+            {
+                throw new ArgumentException("Vehicle id must be non-empty.", nameof(vehicleId));
+            }
+
+            if (totalAmount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(totalAmount), "Invoice total cannot be negative.");
+            }
+
             Id = id;
             CustomerId = customerId;
             VehicleId = vehicleId;
-            InvoiceNumber = invoiceNumber ?? throw new ArgumentNullException(nameof(invoiceNumber));
+            InvoiceNumber = ValidateRequired(invoiceNumber, nameof(invoiceNumber), MaxInvoiceNumberLength);
             InvoiceDate = invoiceDate;
             TotalAmount = totalAmount;
-            Status = status ?? throw new ArgumentNullException(nameof(status));
-            LineItems = lineItems ?? throw new ArgumentNullException(nameof(lineItems));
+            Status = ValidateRequired(status, nameof(status), MaxStatusLength);
+            LineItems = CloneLineItems(lineItems);
         }
 
         /// <summary>
@@ -83,6 +109,38 @@ namespace CRMAdapter.CommonDomain
         /// Gets the immutable collection of invoice line items.
         /// </summary>
         public IReadOnlyCollection<InvoiceLine> LineItems { get; }
+
+        private static string ValidateRequired(string value, string parameterName, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException($"{parameterName} must be provided.", parameterName);
+            }
+
+            var trimmed = value.Trim();
+            if (trimmed.Length > maxLength)
+            {
+                throw new ArgumentException($"{parameterName} cannot exceed {maxLength} characters.", parameterName);
+            }
+
+            return trimmed;
+        }
+
+        private static IReadOnlyCollection<InvoiceLine> CloneLineItems(IReadOnlyCollection<InvoiceLine> lineItems)
+        {
+            if (lineItems is null)
+            {
+                throw new ArgumentNullException(nameof(lineItems));
+            }
+
+            var items = lineItems.Where(item => item is not null).ToList();
+            if (items.Count != lineItems.Count)
+            {
+                throw new ArgumentException("Line items cannot contain null entries.", nameof(lineItems));
+            }
+
+            return new ReadOnlyCollection<InvoiceLine>(items);
+        }
     }
 
     /// <summary>
@@ -90,6 +148,8 @@ namespace CRMAdapter.CommonDomain
     /// </summary>
     public sealed class InvoiceLine
     {
+        private const int MaxDescriptionLength = 256;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="InvoiceLine"/> class.
         /// </summary>
@@ -99,7 +159,22 @@ namespace CRMAdapter.CommonDomain
         /// <param name="taxAmount">Associated tax amount.</param>
         public InvoiceLine(string description, decimal quantity, decimal unitPrice, decimal taxAmount)
         {
-            Description = description ?? throw new ArgumentNullException(nameof(description));
+            if (quantity < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity cannot be negative.");
+            }
+
+            if (unitPrice < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(unitPrice), "Unit price cannot be negative.");
+            }
+
+            if (taxAmount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(taxAmount), "Tax amount cannot be negative.");
+            }
+
+            Description = ValidateDescription(description);
             Quantity = quantity;
             UnitPrice = unitPrice;
             TaxAmount = taxAmount;
@@ -124,5 +199,21 @@ namespace CRMAdapter.CommonDomain
         /// Gets the tax amount.
         /// </summary>
         public decimal TaxAmount { get; }
+
+        private static string ValidateDescription(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException("Description must be provided.", nameof(value));
+            }
+
+            var trimmed = value.Trim();
+            if (trimmed.Length > MaxDescriptionLength)
+            {
+                throw new ArgumentException($"Description cannot exceed {MaxDescriptionLength} characters.", nameof(value));
+            }
+
+            return trimmed;
+        }
     }
 }

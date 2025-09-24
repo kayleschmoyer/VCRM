@@ -1,14 +1,18 @@
 /*
  * File: SqlAdapterBase.cs
- * Role: Provides shared SQL helper functionality for Vast Online adapters.
- * Architectural Purpose: Centralizes connection management and parameter creation for consistent async data access.
+ * Purpose: Provides shared SQL helper functionality for Vast Online adapters.
+ * Security Considerations: Enforces dependency-injected retry policies, rate limiting, sanitized command creation, and exception wrapping to avoid leaking sensitive backend information.
+ * Example Usage: `await ExecuteDbOperationAsync("VehicleAdapter.GetById", ct => command.ExecuteReaderAsync(ct), cancellationToken);`
  */
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.CommonConfig;
+using CRMAdapter.CommonContracts;
+using CRMAdapter.CommonInfrastructure;
 
 namespace CRMAdapter.VastOnline.Adapter
 {
@@ -25,10 +29,21 @@ namespace CRMAdapter.VastOnline.Adapter
         /// </summary>
         /// <param name="connection">Database connection.</param>
         /// <param name="fieldMap">Schema field mapping.</param>
-        protected SqlAdapterBase(DbConnection connection, FieldMap fieldMap)
+        /// <param name="retryPolicy">Retry policy for transient errors.</param>
+        /// <param name="logger">Logger for diagnostics.</param>
+        /// <param name="rateLimiter">Rate limiter for throttling.</param>
+        protected SqlAdapterBase(
+            DbConnection connection,
+            FieldMap fieldMap,
+            ISqlRetryPolicy? retryPolicy = null,
+            IAdapterLogger? logger = null,
+            IAdapterRateLimiter? rateLimiter = null)
         {
             Connection = connection ?? throw new ArgumentNullException(nameof(connection));
             FieldMap = fieldMap ?? throw new ArgumentNullException(nameof(fieldMap));
+            Logger = logger ?? NullAdapterLogger.Instance;
+            RateLimiter = rateLimiter ?? NoopAdapterRateLimiter.Instance;
+            RetryPolicy = retryPolicy ?? new ExponentialBackoffRetryPolicy(logger: Logger);
         }
 
         /// <summary>
@@ -42,6 +57,26 @@ namespace CRMAdapter.VastOnline.Adapter
         protected FieldMap FieldMap { get; }
 
         /// <summary>
+        /// Gets the retry policy used for SQL operations.
+        /// </summary>
+        protected ISqlRetryPolicy RetryPolicy { get; }
+
+        /// <summary>
+        /// Gets the logger used for diagnostics.
+        /// </summary>
+        protected IAdapterLogger Logger { get; }
+
+        /// <summary>
+        /// Gets the rate limiter enforcing adapter throttling.
+        /// </summary>
+        protected IAdapterRateLimiter RateLimiter { get; }
+
+        /// <summary>
+        /// Gets the backend name from the mapping file.
+        /// </summary>
+        protected string BackendName => FieldMap.BackendName;
+
+        /// <summary>
         /// Creates a command with the provided text after ensuring the connection is open.
         /// </summary>
         /// <param name="commandText">SQL command text.</param>
@@ -49,9 +84,9 @@ namespace CRMAdapter.VastOnline.Adapter
         /// <returns>An initialized <see cref="DbCommand"/>.</returns>
         protected async Task<DbCommand> CreateCommandAsync(string commandText, CancellationToken cancellationToken)
         {
-            if (commandText is null)
+            if (string.IsNullOrWhiteSpace(commandText))
             {
-                throw new ArgumentNullException(nameof(commandText));
+                throw new ArgumentException("Command text must be provided.", nameof(commandText));
             }
 
             await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -75,9 +110,9 @@ namespace CRMAdapter.VastOnline.Adapter
                 throw new ArgumentNullException(nameof(command));
             }
 
-            if (name is null)
+            if (string.IsNullOrWhiteSpace(name))
             {
-                throw new ArgumentNullException(nameof(name));
+                throw new ArgumentException("Parameter name must be provided.", nameof(name));
             }
 
             var parameter = command.CreateParameter();
@@ -89,6 +124,122 @@ namespace CRMAdapter.VastOnline.Adapter
             }
 
             command.Parameters.Add(parameter);
+        }
+
+        /// <summary>
+        /// Executes a database operation with retry, rate limiting, and safe exception wrapping.
+        /// </summary>
+        /// <typeparam name="TResult">Result type.</typeparam>
+        /// <param name="operationName">Operation identifier used for logging.</param>
+        /// <param name="operation">Operation callback.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Operation result.</returns>
+        protected Task<TResult> ExecuteDbOperationAsync<TResult>(
+            string operationName,
+            Func<CancellationToken, Task<TResult>> operation,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(operationName))
+            {
+                throw new ArgumentException("Operation name must be provided.", nameof(operationName));
+            }
+
+            if (operation is null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            return RetryPolicy.ExecuteAsync(async ct =>
+            {
+                var lease = await RateLimiter.AcquireAsync(operationName, ct).ConfigureAwait(false);
+                using (lease)
+                {
+                    try
+                    {
+                        return await operation(ct).ConfigureAwait(false);
+                    }
+                    catch (AdapterException)
+                    {
+                        throw;
+                    }
+                    catch (MappingConfigurationException)
+                    {
+                        throw;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(
+                            "Adapter operation failed.",
+                            ex,
+                            new Dictionary<string, object?>
+                            {
+                                ["Operation"] = operationName,
+                                ["Backend"] = BackendName,
+                                ["ExceptionType"] = ex.GetType().FullName
+                            });
+                        throw new AdapterDataAccessException(operationName, BackendName, ex);
+                    }
+                }
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Executes a database operation that returns no result with retry, rate limiting, and safe exception wrapping.
+        /// </summary>
+        /// <param name="operationName">Operation identifier used for logging.</param>
+        /// <param name="operation">Operation callback.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        protected Task ExecuteDbOperationAsync(
+            string operationName,
+            Func<CancellationToken, Task> operation,
+            CancellationToken cancellationToken)
+        {
+            if (operation is null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            return ExecuteDbOperationAsync<object?>(operationName, async ct =>
+            {
+                await operation(ct).ConfigureAwait(false);
+                return null;
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Applies a safe upper bound to caller supplied limits.
+        /// </summary>
+        /// <param name="requested">Requested limit.</param>
+        /// <param name="defaultLimit">Default limit enforced by the adapter.</param>
+        /// <param name="parameterName">Parameter name for validation.</param>
+        /// <returns>Sanitized limit.</returns>
+        protected static int EnforceLimit(int requested, int defaultLimit, string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(parameterName))
+            {
+                throw new ArgumentException("Parameter name must be provided.", nameof(parameterName));
+            }
+
+            if (defaultLimit <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(defaultLimit));
+            }
+
+            if (requested <= 0)
+            {
+                return defaultLimit;
+            }
+
+            if (requested > defaultLimit)
+            {
+                throw new InvalidAdapterRequestException($"{parameterName} cannot exceed {defaultLimit}.");
+            }
+
+            return requested;
         }
 
         /// <summary>
@@ -114,6 +265,7 @@ namespace CRMAdapter.VastOnline.Adapter
             if (disposing)
             {
                 Connection.Dispose();
+                _connectionLock.Dispose();
             }
 
             _disposed = true;
