@@ -1,7 +1,7 @@
 @* List.razor: Customers workspace landing page with responsive table, instant filtering, and action affordances. *@
 @page "/customers"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
-@inject ICustomerDirectory CustomerDirectory
+@inject ICustomerService CustomerDirectory
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-customers-container">

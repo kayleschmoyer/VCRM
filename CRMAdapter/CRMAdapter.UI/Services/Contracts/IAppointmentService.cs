@@ -1,13 +1,13 @@
-// IAppointmentBook.cs: Contract for querying, filtering, and projecting appointment data across the CRM.
+// IAppointmentService.cs: Stable contract for querying appointment timelines and summaries across providers.
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.UI.Services.Appointments.Models;
 
-namespace CRMAdapter.UI.Services.Appointments;
+namespace CRMAdapter.UI.Services.Contracts;
 
-public interface IAppointmentBook
+public interface IAppointmentService
 {
     Task<IReadOnlyList<AppointmentSummary>> GetAppointmentsAsync(
         DateTime? start = null,

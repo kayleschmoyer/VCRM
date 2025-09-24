@@ -1,13 +1,13 @@
-// IVehicleRegistry.cs: Abstraction for querying vehicles and related history streams.
+// IVehicleService.cs: Stable contract for vehicle catalog and detail retrieval across data providers.
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.UI.Services.Vehicles.Models;
 
-namespace CRMAdapter.UI.Services.Vehicles;
+namespace CRMAdapter.UI.Services.Contracts;
 
-public interface IVehicleRegistry
+public interface IVehicleService
 {
     Task<IReadOnlyList<VehicleSummary>> GetVehiclesAsync(CancellationToken cancellationToken = default);
 

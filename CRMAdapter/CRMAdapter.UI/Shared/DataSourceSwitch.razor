@@ -1,0 +1,155 @@
+@* DataSourceSwitch.razor: Developer-only control for flipping data source modes at runtime and persisting overrides. *@
+@using System.Linq
+@using System.Text.Json
+@using CRMAdapter.UI.Core.DataSource
+@inject IDataSourceStrategy Strategy
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject IWebHostEnvironment HostEnvironment
+
+@if (_isVisible)
+{
+    <MudPaper Class="crm-datasource-switch" Elevation="1" Square="false">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.subtitle2">Hybrid data source</MudText>
+            <MudText Typo="Typo.caption">Switch entities between Mock, Live, or Auto. Refresh after changing modes.</MudText>
+            <MudGrid Spacing="2">
+                @foreach (var entry in _modes.OrderBy(pair => pair.Key))
+                {
+                    <MudItem xs="12" sm="6" md="4" lg="3">
+                        <MudSelect T="DataSourceMode"
+                                   Dense="true"
+                                   Label="@entry.Key"
+                                   Value="@entry.Value"
+                                   ValueChanged="mode => OnModeChangedAsync(entry.Key, mode)"
+                                   DisableUnderLine="true">
+                            @foreach (var mode in _availableModes)
+                            {
+                                <MudSelectItem T="DataSourceMode" Value="@mode">@mode</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+            </MudGrid>
+            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="ResetOverridesAsync" Disabled="@(!_hasOverrides)">Reset overrides</MudButton>
+                @if (_hasOverrides)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Warning">Overrides active for this session.</MudText>
+                }
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    private const string StorageKey = "crmAdapter:dataSourceModes";
+    private readonly IReadOnlyList<DataSourceMode> _availableModes = Enum.GetValues<DataSourceMode>();
+    private Dictionary<string, DataSourceMode> _baseline = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, DataSourceMode> _modes = new(StringComparer.OrdinalIgnoreCase);
+    private bool _isVisible;
+
+    private bool _hasOverrides => _modes.Any(pair => _baseline.TryGetValue(pair.Key, out var original) && original != pair.Value);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isVisible = HostEnvironment.IsDevelopment();
+        if (!_isVisible)
+        {
+            return;
+        }
+
+        var configured = Strategy.GetConfiguredModes();
+        _baseline = configured.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        _modes = new Dictionary<string, DataSourceMode>(_baseline, StringComparer.OrdinalIgnoreCase);
+
+        await LoadOverridesAsync();
+    }
+
+    private async Task LoadOverridesAsync()
+    {
+        try
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (string.IsNullOrWhiteSpace(stored))
+            {
+                return;
+            }
+
+            var overrides = JsonSerializer.Deserialize<Dictionary<string, string>>(stored);
+            if (overrides is null)
+            {
+                return;
+            }
+
+            foreach (var entry in overrides)
+            {
+                if (Enum.TryParse<DataSourceMode>(entry.Value, true, out var mode))
+                {
+                    ApplyOverride(entry.Key, mode);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        }
+    }
+
+    private async Task OnModeChangedAsync(string key, DataSourceMode mode)
+    {
+        ApplyOverride(key, mode);
+        await PersistOverridesAsync();
+        Snackbar.Add($"{key} data source set to {mode}. Refresh to ensure new services are resolved.", Severity.Info);
+        StateHasChanged();
+    }
+
+    private void ApplyOverride(string key, DataSourceMode mode)
+    {
+        _modes[key] = mode;
+        if (_baseline.TryGetValue(key, out var original) && original == mode)
+        {
+            Strategy.ClearOverride(key);
+        }
+        else
+        {
+            Strategy.TrySetOverride(key, mode);
+        }
+    }
+
+    private async Task PersistOverridesAsync()
+    {
+        var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in _modes)
+        {
+            if (_baseline.TryGetValue(pair.Key, out var original) && original == pair.Value)
+            {
+                continue;
+            }
+
+            overrides[pair.Key] = pair.Value.ToString();
+        }
+
+        if (overrides.Count == 0)
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        }
+        else
+        {
+            var json = JsonSerializer.Serialize(overrides);
+            await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+        }
+    }
+
+    private async Task ResetOverridesAsync()
+    {
+        foreach (var key in _baseline.Keys.ToList())
+        {
+            ApplyOverride(key, _baseline[key]);
+        }
+
+        await PersistOverridesAsync();
+        Snackbar.Add("Data source overrides cleared. Refresh to restore default services.", Severity.Success);
+        StateHasChanged();
+    }
+}

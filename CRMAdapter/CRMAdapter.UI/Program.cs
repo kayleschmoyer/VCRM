@@ -1,15 +1,22 @@
 // Program.cs: Configures dependency injection, security, and MudBlazor services for the CRM Adapter UI.
 using System.Net.Http.Headers;
 using CRMAdapter.UI.Auth;
+using CRMAdapter.UI.Core.DataSource;
 using CRMAdapter.UI.Hosting;
 using CRMAdapter.UI.Infrastructure.Security;
 using CRMAdapter.UI.Navigation;
-using CRMAdapter.UI.Services.Appointments;
-using CRMAdapter.UI.Services.Customers;
+using CRMAdapter.UI.Services.Api.Appointments;
+using CRMAdapter.UI.Services.Api.Customers;
+using CRMAdapter.UI.Services.Api.Dashboard;
+using CRMAdapter.UI.Services.Api.Invoices;
+using CRMAdapter.UI.Services.Api.Vehicles;
+using CRMAdapter.UI.Services.Contracts;
 using CRMAdapter.UI.Services.Diagnostics;
-using CRMAdapter.UI.Services.Dashboard;
-using CRMAdapter.UI.Services.Invoices;
-using CRMAdapter.UI.Services.Vehicles;
+using CRMAdapter.UI.Services.Mock.Appointments;
+using CRMAdapter.UI.Services.Mock.Customers;
+using CRMAdapter.UI.Services.Mock.Dashboard;
+using CRMAdapter.UI.Services.Mock.Invoices;
+using CRMAdapter.UI.Services.Mock.Vehicles;
 using CRMAdapter.UI.Theming;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -75,18 +82,36 @@ builder.Services.AddScoped<JwtAuthProvider>();
 builder.Services.AddSingleton<NavigationMenuService>();
 builder.Services.AddScoped<AppThemeState>();
 builder.Services.AddScoped<CorrelationContext>();
-builder.Services.AddSingleton<ICustomerDirectory, InMemoryCustomerDirectory>();
-builder.Services.AddSingleton<IVehicleRegistry, InMemoryVehicleRegistry>();
-builder.Services.AddSingleton<IInvoiceWorkspace, InMemoryInvoiceWorkspace>();
-builder.Services.AddSingleton<IAppointmentBook, InMemoryAppointmentBook>();
-builder.Services.AddSingleton<IDashboardAnalytics, InMemoryDashboardAnalytics>();
+builder.Services.Configure<DataSourceOptions>(builder.Configuration.GetSection("DataSource"));
 
-builder.Services.AddHttpClient(HttpClientNames.CrmApi, client =>
-    {
-        var baseAddress = builder.Configuration["RemoteApis:CrmApi:BaseUri"] ?? "https://localhost:7150/";
-        client.BaseAddress = new Uri(baseAddress);
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    });
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5001";
+var apiBaseAddress = new Uri(apiBaseUrl);
+
+void ConfigureCrmClient(HttpClient client)
+{
+    client.BaseAddress = apiBaseAddress;
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+}
+
+builder.Services.AddHttpClient(HttpClientNames.CrmApi, ConfigureCrmClient);
+builder.Services.AddHttpClient<CustomerApiClient>(ConfigureCrmClient);
+builder.Services.AddHttpClient<VehicleApiClient>(ConfigureCrmClient);
+builder.Services.AddHttpClient<InvoiceApiClient>(ConfigureCrmClient);
+builder.Services.AddHttpClient<AppointmentApiClient>(ConfigureCrmClient);
+builder.Services.AddHttpClient<DashboardApiClient>(ConfigureCrmClient);
+
+builder.Services.AddScoped<InMemoryCustomerDirectory>();
+builder.Services.AddScoped<InMemoryVehicleRegistry>();
+builder.Services.AddScoped<InMemoryInvoiceWorkspace>();
+builder.Services.AddScoped<InMemoryAppointmentBook>();
+builder.Services.AddScoped<InMemoryDashboardAnalytics>();
+
+builder.Services.AddScoped<IDataSourceStrategy, DataSourceStrategy>();
+builder.Services.AddScoped<ICustomerService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<ICustomerService>());
+builder.Services.AddScoped<IVehicleService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IVehicleService>());
+builder.Services.AddScoped<IInvoiceService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IInvoiceService>());
+builder.Services.AddScoped<IAppointmentService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IAppointmentService>());
+builder.Services.AddScoped<IDashboardService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IDashboardService>());
 
 builder.Services.AddMudServices(config =>
 {

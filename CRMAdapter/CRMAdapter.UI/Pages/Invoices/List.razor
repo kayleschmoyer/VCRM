@@ -1,7 +1,7 @@
 @* List.razor: Financial control tower showcasing invoices with deep filtering and cross-navigation. *@
 @page "/invoices"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
-@inject IInvoiceWorkspace InvoiceWorkspace
+@inject IInvoiceService InvoiceWorkspace
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-invoices-container">

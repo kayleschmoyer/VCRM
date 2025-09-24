@@ -5,10 +5,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.UI.Services.Appointments.Models;
+using CRMAdapter.UI.Services.Contracts;
 
-namespace CRMAdapter.UI.Services.Appointments;
+namespace CRMAdapter.UI.Services.Mock.Appointments;
 
-public sealed class InMemoryAppointmentBook : IAppointmentBook
+public sealed class InMemoryAppointmentBook : IAppointmentService
 {
     private readonly Dictionary<Guid, AppointmentSeedRecord> _records;
 

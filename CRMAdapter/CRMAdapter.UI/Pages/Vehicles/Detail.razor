@@ -1,8 +1,8 @@
 @* Detail.razor: Immersive vehicle 360 bringing together identity, owner, and lifecycle history. *@
 @page "/vehicles/{VehicleId:guid}"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
-@inject IVehicleRegistry VehicleRegistry
-@inject IInvoiceWorkspace InvoiceWorkspace
+@inject IVehicleService VehicleRegistry
+@inject IInvoiceService InvoiceWorkspace
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-vehicle-detail">

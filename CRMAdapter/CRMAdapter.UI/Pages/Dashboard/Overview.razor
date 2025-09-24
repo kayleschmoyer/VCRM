@@ -1,7 +1,7 @@
 @* Overview.razor: Executive dashboard blending KPI cards, charts, and unified activity feed. *@
 @page "/dashboard"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
-@inject IDashboardAnalytics Analytics
+@inject IDashboardService Analytics
 
 <MudStack Spacing="3" Class="crm-dashboard-overview">
     <MudStack Spacing="0.5">

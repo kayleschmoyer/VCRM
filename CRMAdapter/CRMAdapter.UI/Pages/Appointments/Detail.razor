@@ -1,7 +1,7 @@
 @* Detail.razor: Rich detail workspace for a single appointment with entity links and actions. *@
 @page "/appointments/{AppointmentId:guid}"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
-@inject IAppointmentBook AppointmentBook
+@inject IAppointmentService AppointmentBook
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 

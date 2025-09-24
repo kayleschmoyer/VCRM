@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.UI.Services.Appointments;
+using CRMAdapter.UI.Services.Contracts;
+using CRMAdapter.UI.Services.Mock.Appointments;
 using CRMAdapter.UI.Services.Customers.Models;
 
-namespace CRMAdapter.UI.Services.Customers;
+namespace CRMAdapter.UI.Services.Mock.Customers;
 
-public sealed class InMemoryCustomerDirectory : ICustomerDirectory
+public sealed class InMemoryCustomerDirectory : ICustomerService
 {
     private readonly IReadOnlyList<CustomerDetail> _customers;
 
