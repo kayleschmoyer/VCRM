@@ -1,7 +1,8 @@
 /*
  * File: MappingValidator.cs
- * Role: Provides validation helpers for schema mapping files and exposes rich configuration exceptions.
- * Architectural Purpose: Guarantees adapter stability by failing fast when configuration drift is detected.
+ * Purpose: Provides validation helpers for schema mapping files and exposes rich configuration exceptions with schema version checks.
+ * Security Considerations: Prevents adapters from starting with stale or tampered mappings by enforcing version compatibility and strict key validation.
+ * Example Usage: `MappingValidator.EnsureMappings(fieldMap, requiredKeys, nameof(CustomerAdapter));`
  */
 using System;
 using System.Collections.Generic;
@@ -14,6 +15,8 @@ namespace CRMAdapter.CommonConfig
     /// </summary>
     public static class MappingValidator
     {
+        private static readonly Version MinimumSupportedSchemaVersion = new(1, 0);
+
         /// <summary>
         /// Ensures the specified canonical keys are present in the <see cref="FieldMap"/>.
         /// </summary>
@@ -32,6 +35,13 @@ namespace CRMAdapter.CommonConfig
                 throw new ArgumentNullException(nameof(canonicalKeys));
             }
 
+            if (string.IsNullOrWhiteSpace(adapterName))
+            {
+                throw new ArgumentException("Adapter name must be provided.", nameof(adapterName));
+            }
+
+            EnsureSchemaCompatibility(fieldMap, adapterName);
+
             var missingKeys = canonicalKeys
                 .Where(key => !fieldMap.TryGetTarget(key, out _))
                 .ToArray();
@@ -41,6 +51,54 @@ namespace CRMAdapter.CommonConfig
                 throw new MappingConfigurationException(
                     AdapterErrorCodes.MissingMapping,
                     $"Adapter '{adapterName}' detected missing mappings: {string.Join(", ", missingKeys)}.");
+            }
+        }
+
+        /// <summary>
+        /// Ensures that the mapping declares a source for each provided entity.
+        /// </summary>
+        /// <param name="fieldMap">Mapping instance.</param>
+        /// <param name="entities">Entity names requiring sources.</param>
+        /// <param name="adapterName">Adapter name for diagnostic messages.</param>
+        public static void EnsureEntitySources(FieldMap fieldMap, IEnumerable<string> entities, string adapterName)
+        {
+            if (fieldMap is null)
+            {
+                throw new ArgumentNullException(nameof(fieldMap));
+            }
+
+            if (entities is null)
+            {
+                throw new ArgumentNullException(nameof(entities));
+            }
+
+            if (string.IsNullOrWhiteSpace(adapterName))
+            {
+                throw new ArgumentException("Adapter name must be provided.", nameof(adapterName));
+            }
+
+            EnsureSchemaCompatibility(fieldMap, adapterName);
+
+            foreach (var entity in entities)
+            {
+                if (string.IsNullOrWhiteSpace(entity))
+                {
+                    throw new MappingConfigurationException(
+                        AdapterErrorCodes.InvalidMapping,
+                        $"Adapter '{adapterName}' encountered an empty entity name while validating sources.");
+                }
+
+                fieldMap.GetEntitySource(entity); // Will throw when missing.
+            }
+        }
+
+        private static void EnsureSchemaCompatibility(FieldMap fieldMap, string adapterName)
+        {
+            if (fieldMap.SchemaVersion < MinimumSupportedSchemaVersion)
+            {
+                throw new MappingConfigurationException(
+                    AdapterErrorCodes.InvalidMapping,
+                    $"Adapter '{adapterName}' requires mapping schema version '{MinimumSupportedSchemaVersion}' or above. Current version is '{fieldMap.SchemaVersion}'.");
             }
         }
     }

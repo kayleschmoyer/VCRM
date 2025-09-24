@@ -1,7 +1,8 @@
 /*
  * File: InvoiceAdapter.cs
- * Role: Implements canonical invoice access for the Vast Online backend.
- * Architectural Purpose: Converts Azure SQL invoice data into the CRM canonical invoice aggregate with line items.
+ * Purpose: Implements canonical invoice access for the Vast Online backend.
+ * Security Considerations: Validates identifiers, clamps pagination limits, parameterizes SQL, and executes operations under retry and throttling policies to avoid leaking backend faults.
+ * Example Usage: `var invoices = await adapter.GetByCustomerAsync(customerId, 100, cancellationToken);`
  */
 using System;
 using System.Collections.Generic;
@@ -14,6 +15,7 @@ using System.Threading.Tasks;
 using CRMAdapter.CommonConfig;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonDomain;
+using CRMAdapter.CommonInfrastructure;
 
 namespace CRMAdapter.VastOnline.Adapter
 {
@@ -64,139 +66,188 @@ namespace CRMAdapter.VastOnline.Adapter
         /// </summary>
         /// <param name="connection">Database connection.</param>
         /// <param name="fieldMap">Field map configuration.</param>
+        /// <param name="retryPolicy">Retry policy implementation.</param>
+        /// <param name="logger">Logger for diagnostics.</param>
+        /// <param name="rateLimiter">Rate limiter controlling throughput.</param>
         /// <param name="defaultListLimit">Default maximum results for list operations.</param>
-        public InvoiceAdapter(DbConnection connection, FieldMap fieldMap, int defaultListLimit = DefaultListLimit)
-            : base(connection, fieldMap)
+        public InvoiceAdapter(
+            DbConnection connection,
+            FieldMap fieldMap,
+            ISqlRetryPolicy? retryPolicy = null,
+            IAdapterLogger? logger = null,
+            IAdapterRateLimiter? rateLimiter = null,
+            int defaultListLimit = DefaultListLimit)
+            : base(connection, fieldMap, retryPolicy, logger, rateLimiter)
         {
+            if (defaultListLimit <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(defaultListLimit), "Default list limit must be positive.");
+            }
+
             _defaultListLimit = defaultListLimit;
             MappingValidator.EnsureMappings(fieldMap, RequiredInvoiceKeys, nameof(InvoiceAdapter));
             MappingValidator.EnsureMappings(fieldMap, RequiredInvoiceLineKeys, nameof(InvoiceAdapter));
+            MappingValidator.EnsureEntitySources(fieldMap, new[] { "Invoice", "InvoiceLine" }, nameof(InvoiceAdapter));
         }
 
         /// <inheritdoc />
-        public async Task<Invoice?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        public Task<Invoice?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var fieldMap = FieldMap.GetTargets("Invoice", InvoiceProjectionFields);
-            var source = FieldMap.GetEntitySource("Invoice");
-            var selectClause = string.Join(", ", fieldMap.Select(kvp => $"{kvp.Value} AS [{kvp.Key}]"));
-            var commandText = $"SELECT {selectClause} FROM {source} WHERE {fieldMap["Id"]} = @id";
-
-            await using var command = await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(false);
-            AddParameter(command, "@id", id);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            if (id == Guid.Empty)
             {
-                return null;
+                throw new InvalidAdapterRequestException("Invoice id must be provided.");
             }
 
-            var invoice = ReadInvoice(reader);
-            var lines = await LoadInvoiceLinesAsync(new[] { invoice.Id }, cancellationToken).ConfigureAwait(false);
-            var lineItems = lines.TryGetValue(invoice.Id, out var collection)
-                ? collection
-                : Array.Empty<InvoiceLine>();
+            return ExecuteDbOperationAsync(
+                "InvoiceAdapter.GetById",
+                async ct =>
+                {
+                    var fieldMap = FieldMap.GetTargets("Invoice", InvoiceProjectionFields);
+                    var source = FieldMap.GetEntitySource("Invoice");
+                    var selectClause = string.Join(", ", fieldMap.Select(kvp => $"{kvp.Value} AS [{kvp.Key}]"));
+                    var commandText = $"SELECT {selectClause} FROM {source} WHERE {fieldMap["Id"]} = @id";
 
-            return new Invoice(
-                invoice.Id,
-                invoice.CustomerId,
-                invoice.VehicleId,
-                invoice.InvoiceNumber,
-                invoice.InvoiceDate,
-                invoice.TotalAmount,
-                invoice.Status,
-                lineItems);
+                    await using var command = await CreateCommandAsync(commandText, ct).ConfigureAwait(false);
+                    AddParameter(command, "@id", id);
+
+                    await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    if (!await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        return null;
+                    }
+
+                    var invoice = ReadInvoice(reader);
+                    var lines = await LoadInvoiceLinesAsync(new[] { invoice.Id }, ct).ConfigureAwait(false);
+                    var lineItems = lines.TryGetValue(invoice.Id, out var collection)
+                        ? collection
+                        : Array.Empty<InvoiceLine>();
+
+                    return new Invoice(
+                        invoice.Id,
+                        invoice.CustomerId,
+                        invoice.VehicleId,
+                        invoice.InvoiceNumber,
+                        invoice.InvoiceDate,
+                        invoice.TotalAmount,
+                        invoice.Status,
+                        lineItems);
+                },
+                cancellationToken);
         }
 
         /// <inheritdoc />
-        public async Task<IReadOnlyCollection<Invoice>> GetByCustomerAsync(
+        public Task<IReadOnlyCollection<Invoice>> GetByCustomerAsync(
             Guid customerId,
             int maxResults,
             CancellationToken cancellationToken = default)
         {
-            var limit = Math.Min(_defaultListLimit, maxResults > 0 ? maxResults : _defaultListLimit);
-            var fieldMap = FieldMap.GetTargets("Invoice", InvoiceProjectionFields);
-            var source = FieldMap.GetEntitySource("Invoice");
-            var selectClause = string.Join(", ", fieldMap.Select(kvp => $"{kvp.Value} AS [{kvp.Key}]"));
-            var commandText = $@"SELECT TOP (@limit) {selectClause}
+            if (customerId == Guid.Empty)
+            {
+                throw new InvalidAdapterRequestException("Customer id must be provided.");
+            }
+
+            var limit = EnforceLimit(maxResults, _defaultListLimit, nameof(maxResults));
+
+            return ExecuteDbOperationAsync(
+                "InvoiceAdapter.GetByCustomer",
+                async ct =>
+                {
+                    var fieldMap = FieldMap.GetTargets("Invoice", InvoiceProjectionFields);
+                    var source = FieldMap.GetEntitySource("Invoice");
+                    var selectClause = string.Join(", ", fieldMap.Select(kvp => $"{kvp.Value} AS [{kvp.Key}]"));
+                    var commandText = $@"SELECT TOP (@limit) {selectClause}
 FROM {source}
 WHERE {fieldMap["CustomerId"]} = @customerId
 ORDER BY {fieldMap["Date"]} DESC;";
 
-            await using var command = await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(false);
-            AddParameter(command, "@limit", limit, DbType.Int32);
-            AddParameter(command, "@customerId", customerId);
+                    await using var command = await CreateCommandAsync(commandText, ct).ConfigureAwait(false);
+                    AddParameter(command, "@limit", limit, DbType.Int32);
+                    AddParameter(command, "@customerId", customerId);
 
-            var invoices = new List<InvoiceRecord>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                invoices.Add(ReadInvoice(reader));
-            }
+                    var invoices = new List<InvoiceRecord>();
+                    await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        invoices.Add(ReadInvoice(reader));
+                    }
 
-            var lineLookup = await LoadInvoiceLinesAsync(invoices.Select(i => i.Id), cancellationToken).ConfigureAwait(false);
-            var results = invoices.Select(record =>
-            {
-                var lines = lineLookup.TryGetValue(record.Id, out var items)
-                    ? items
-                    : Array.Empty<InvoiceLine>();
-                return new Invoice(
-                    record.Id,
-                    record.CustomerId,
-                    record.VehicleId,
-                    record.InvoiceNumber,
-                    record.InvoiceDate,
-                    record.TotalAmount,
-                    record.Status,
-                    lines);
-            }).ToList();
+                    var lineLookup = await LoadInvoiceLinesAsync(invoices.Select(i => i.Id), ct).ConfigureAwait(false);
+                    var results = invoices.Select(record =>
+                    {
+                        var lines = lineLookup.TryGetValue(record.Id, out var items)
+                            ? items
+                            : Array.Empty<InvoiceLine>();
+                        return new Invoice(
+                            record.Id,
+                            record.CustomerId,
+                            record.VehicleId,
+                            record.InvoiceNumber,
+                            record.InvoiceDate,
+                            record.TotalAmount,
+                            record.Status,
+                            lines);
+                    }).ToList();
 
-            return new ReadOnlyCollection<Invoice>(results);
+                    return (IReadOnlyCollection<Invoice>)new ReadOnlyCollection<Invoice>(results);
+                },
+                cancellationToken);
         }
 
-        private async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<InvoiceLine>>> LoadInvoiceLinesAsync(
+        private Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<InvoiceLine>>> LoadInvoiceLinesAsync(
             IEnumerable<Guid> invoiceIds,
             CancellationToken cancellationToken)
         {
-            var ids = invoiceIds.Distinct().ToList();
-            if (ids.Count == 0)
+            if (invoiceIds is null)
             {
-                return new Dictionary<Guid, IReadOnlyCollection<InvoiceLine>>();
+                throw new ArgumentNullException(nameof(invoiceIds));
             }
 
-            var fields = FieldMap.GetTargets("InvoiceLine", new[] { "InvoiceId", "Description", "Quantity", "UnitPrice", "Tax" });
-            var source = FieldMap.GetEntitySource("InvoiceLine");
-            var parameterNames = ids.Select((_, index) => $"@i{index}").ToArray();
-            var selectClause = $"{fields["InvoiceId"]} AS [InvoiceId], {fields["Description"]} AS [Description], {fields["Quantity"]} AS [Quantity], {fields["UnitPrice"]} AS [UnitPrice], {fields["Tax"]} AS [Tax]";
-            var commandText = $"SELECT {selectClause} FROM {source} WHERE {fields["InvoiceId"]} IN ({string.Join(", ", parameterNames)})";
-
-            await using var command = await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(false);
-            for (var i = 0; i < ids.Count; i++)
-            {
-                AddParameter(command, parameterNames[i], ids[i]);
-            }
-
-            var accumulator = new Dictionary<Guid, List<InvoiceLine>>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var invoiceId = reader.GetGuid(reader.GetOrdinal("InvoiceId"));
-                var description = reader.GetString(reader.GetOrdinal("Description"));
-                var quantity = reader.GetDecimal(reader.GetOrdinal("Quantity"));
-                var unitPrice = reader.GetDecimal(reader.GetOrdinal("UnitPrice"));
-                var tax = reader.GetDecimal(reader.GetOrdinal("Tax"));
-
-                if (!accumulator.TryGetValue(invoiceId, out var list))
+            return ExecuteDbOperationAsync(
+                "InvoiceAdapter.LoadLines",
+                async ct =>
                 {
-                    list = new List<InvoiceLine>();
-                    accumulator[invoiceId] = list;
-                }
+                    var ids = invoiceIds.Distinct().Where(id => id != Guid.Empty).ToList();
+                    if (ids.Count == 0)
+                    {
+                        return (IReadOnlyDictionary<Guid, IReadOnlyCollection<InvoiceLine>>)new Dictionary<Guid, IReadOnlyCollection<InvoiceLine>>();
+                    }
 
-                list.Add(new InvoiceLine(description, quantity, unitPrice, tax));
-            }
+                    var fields = FieldMap.GetTargets("InvoiceLine", new[] { "InvoiceId", "Description", "Quantity", "UnitPrice", "Tax" });
+                    var source = FieldMap.GetEntitySource("InvoiceLine");
+                    var parameterNames = ids.Select((_, index) => $"@i{index}").ToArray();
+                    var selectClause = $"{fields["InvoiceId"]} AS [InvoiceId], {fields["Description"]} AS [Description], {fields["Quantity"]} AS [Quantity], {fields["UnitPrice"]} AS [UnitPrice], {fields["Tax"]} AS [Tax]";
+                    var commandText = $"SELECT {selectClause} FROM {source} WHERE {fields["InvoiceId"]} IN ({string.Join(", ", parameterNames)})";
 
-            return accumulator.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlyCollection<InvoiceLine>)pair.Value.AsReadOnly());
+                    await using var command = await CreateCommandAsync(commandText, ct).ConfigureAwait(false);
+                    for (var i = 0; i < ids.Count; i++)
+                    {
+                        AddParameter(command, parameterNames[i], ids[i]);
+                    }
+
+                    var accumulator = new Dictionary<Guid, List<InvoiceLine>>();
+                    await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        var invoiceId = reader.GetGuid(reader.GetOrdinal("InvoiceId"));
+                        var description = reader.GetString(reader.GetOrdinal("Description"));
+                        var quantity = reader.GetDecimal(reader.GetOrdinal("Quantity"));
+                        var unitPrice = reader.GetDecimal(reader.GetOrdinal("UnitPrice"));
+                        var tax = reader.GetDecimal(reader.GetOrdinal("Tax"));
+
+                        if (!accumulator.TryGetValue(invoiceId, out var list))
+                        {
+                            list = new List<InvoiceLine>();
+                            accumulator[invoiceId] = list;
+                        }
+
+                        list.Add(new InvoiceLine(description, quantity, unitPrice, tax));
+                    }
+
+                    return (IReadOnlyDictionary<Guid, IReadOnlyCollection<InvoiceLine>>)accumulator.ToDictionary(
+                        pair => pair.Key,
+                        pair => (IReadOnlyCollection<InvoiceLine>)pair.Value.AsReadOnly());
+                },
+                cancellationToken);
         }
 
         private static InvoiceRecord ReadInvoice(DbDataReader reader)

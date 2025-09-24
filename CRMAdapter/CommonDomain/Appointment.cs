@@ -1,7 +1,8 @@
 /*
  * File: Appointment.cs
- * Role: Declares the canonical appointment aggregate bridging scheduling data between backend systems.
- * Architectural Purpose: Provides a normalized scheduling model for customer engagement workflows.
+ * Purpose: Declares the canonical appointment aggregate bridging scheduling data between backend systems.
+ * Security Considerations: Validates identifiers, enforces chronological start/end values, and trims strings to avoid injection payloads.
+ * Example Usage: `var appt = new Appointment(id, customerId, vehicleId, startUtc, endUtc, "Advisor", "Confirmed", "Austin");`
  */
 using System;
 
@@ -12,6 +13,10 @@ namespace CRMAdapter.CommonDomain
     /// </summary>
     public sealed class Appointment
     {
+        private const int MaxAdvisorNameLength = 128;
+        private const int MaxStatusLength = 64;
+        private const int MaxLocationLength = 128;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Appointment"/> class.
         /// </summary>
@@ -33,14 +38,34 @@ namespace CRMAdapter.CommonDomain
             string status,
             string location)
         {
+            if (id == Guid.Empty)
+            {
+                throw new ArgumentException("Appointment id must be non-empty.", nameof(id));
+            }
+
+            if (customerId == Guid.Empty)
+            {
+                throw new ArgumentException("Customer id must be non-empty.", nameof(customerId));
+            }
+
+            if (vehicleId == Guid.Empty)
+            {
+                throw new ArgumentException("Vehicle id must be non-empty.", nameof(vehicleId));
+            }
+
+            if (scheduledEnd < scheduledStart)
+            {
+                throw new ArgumentException("Scheduled end must occur after start.", nameof(scheduledEnd));
+            }
+
             Id = id;
             CustomerId = customerId;
             VehicleId = vehicleId;
             ScheduledStart = scheduledStart;
             ScheduledEnd = scheduledEnd;
-            AdvisorName = advisorName ?? throw new ArgumentNullException(nameof(advisorName));
-            Status = status ?? throw new ArgumentNullException(nameof(status));
-            Location = location ?? throw new ArgumentNullException(nameof(location));
+            AdvisorName = ValidateRequired(advisorName, nameof(advisorName), MaxAdvisorNameLength);
+            Status = ValidateRequired(status, nameof(status), MaxStatusLength);
+            Location = ValidateRequired(location, nameof(location), MaxLocationLength);
         }
 
         /// <summary>
@@ -82,5 +107,21 @@ namespace CRMAdapter.CommonDomain
         /// Gets the location for the appointment.
         /// </summary>
         public string Location { get; }
+
+        private static string ValidateRequired(string value, string parameterName, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException($"{parameterName} must be provided.", parameterName);
+            }
+
+            var trimmed = value.Trim();
+            if (trimmed.Length > maxLength)
+            {
+                throw new ArgumentException($"{parameterName} cannot exceed {maxLength} characters.", parameterName);
+            }
+
+            return trimmed;
+        }
     }
 }

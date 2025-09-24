@@ -1,5 +1,6 @@
 {
   "backendName": "VAST Online",
+  "schemaVersion": "1.0",
   "mappings": {
     "Customer": {
       "__source": "[crm].[Customer]",

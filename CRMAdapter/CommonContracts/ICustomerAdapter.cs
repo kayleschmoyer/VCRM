@@ -1,7 +1,8 @@
 /*
  * File: ICustomerAdapter.cs
- * Role: Declares canonical operations for accessing customer data across heterogeneous backends.
- * Architectural Purpose: Enforces the adapter contract for retrieving canonical customers without leaking schema details.
+ * Purpose: Declares canonical operations for accessing customer data across heterogeneous backends.
+ * Security Considerations: Requires implementations to validate inputs, enforce throttling hooks, and return sanitized domain objects.
+ * Example Usage: `var customer = await adapter.GetByIdAsync(customerId, cancellationToken);`
  */
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace CRMAdapter.CommonContracts
         /// <param name="id">The canonical identifier.</param>
         /// <param name="cancellationToken">Token used to cancel the request.</param>
         /// <returns>The customer when found; otherwise, <c>null</c>.</returns>
+        /// <exception cref="InvalidAdapterRequestException">Thrown when the identifier is invalid.</exception>
         Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -31,6 +33,7 @@ namespace CRMAdapter.CommonContracts
         /// <param name="maxResults">Max number of records to return (defaults to framework configuration).</param>
         /// <param name="cancellationToken">Token used to cancel the request.</param>
         /// <returns>Collection of matching customers.</returns>
+        /// <exception cref="InvalidAdapterRequestException">Thrown when the query is invalid.</exception>
         Task<IReadOnlyCollection<Customer>> SearchByNameAsync(
             string nameQuery,
             int maxResults,
@@ -42,6 +45,7 @@ namespace CRMAdapter.CommonContracts
         /// <param name="maxResults">Maximum number of results to return.</param>
         /// <param name="cancellationToken">Token used to cancel the request.</param>
         /// <returns>Collection of recent customers.</returns>
+        /// <exception cref="InvalidAdapterRequestException">Thrown when the requested limit is invalid.</exception>
         Task<IReadOnlyCollection<Customer>> GetRecentCustomersAsync(
             int maxResults,
             CancellationToken cancellationToken = default);

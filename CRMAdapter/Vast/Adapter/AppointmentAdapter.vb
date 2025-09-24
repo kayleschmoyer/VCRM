@@ -1,7 +1,8 @@
 '-----------------------------------------------------------------------
 ' File: AppointmentAdapter.vb
-' Role: Implements canonical appointment access for the VAST Desktop backend.
-' Architectural Purpose: Normalizes service scheduling data into the CRM canonical appointment aggregate.
+' Purpose: Implements canonical appointment access for the VAST Desktop backend.
+' Security Considerations: Validates identifiers and date ranges, clamps list limits, parameterizes SQL, and runs through retry/rate-limited execution to avoid exposing backend faults.
+' Example Usage: `Dim appointments = Await adapter.GetByDateAsync(Date.Today, 100, CancellationToken.None)`
 '-----------------------------------------------------------------------
 Option Strict On
 Option Explicit On
@@ -17,6 +18,7 @@ Imports System.Threading.Tasks
 Imports CRMAdapter.CommonConfig
 Imports CRMAdapter.CommonContracts
 Imports CRMAdapter.CommonDomain
+Imports CRMAdapter.CommonInfrastructure
 
 Namespace CRMAdapter.Vast.Adapter
     ''' <summary>
@@ -56,59 +58,85 @@ Namespace CRMAdapter.Vast.Adapter
         ''' <summary>
         ''' Initializes a new instance of the <see cref="AppointmentAdapter"/> class.
         ''' </summary>
-        Public Sub New(connection As DbConnection, fieldMap As FieldMap, Optional defaultListLimit As Integer = DefaultListLimit)
-            MyBase.New(connection, fieldMap)
+        Public Sub New(
+            connection As DbConnection,
+            fieldMap As FieldMap,
+            Optional retryPolicy As ISqlRetryPolicy = Nothing,
+            Optional logger As IAdapterLogger = Nothing,
+            Optional rateLimiter As IAdapterRateLimiter = Nothing,
+            Optional defaultListLimit As Integer = DefaultListLimit)
+            MyBase.New(connection, fieldMap, retryPolicy, logger, rateLimiter)
+            If defaultListLimit <= 0 Then
+                Throw New ArgumentOutOfRangeException(NameOf(defaultListLimit), "Default list limit must be positive.")
+            End If
+
             _defaultListLimit = defaultListLimit
             MappingValidator.EnsureMappings(fieldMap, RequiredAppointmentKeys, NameOf(AppointmentAdapter))
+            MappingValidator.EnsureEntitySources(fieldMap, New String() {"Appointment"}, NameOf(AppointmentAdapter))
         End Sub
 
         ''' <inheritdoc />
-        Public Async Function GetByIdAsync(id As Guid, Optional cancellationToken As CancellationToken = Nothing) As Task(Of Appointment) Implements IAppointmentAdapter.GetByIdAsync
-            Dim fieldMap = Me.FieldMap.GetTargets("Appointment", AppointmentProjectionFields)
-            Dim source = Me.FieldMap.GetEntitySource("Appointment")
-            Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
-            Dim commandText = $"SELECT {selectClause} FROM {source} WHERE {fieldMap("Id")} = @id"
+        Public Function GetByIdAsync(id As Guid, Optional cancellationToken As CancellationToken = Nothing) As Task(Of Appointment) Implements IAppointmentAdapter.GetByIdAsync
+            If id = Guid.Empty Then
+                Throw New InvalidAdapterRequestException("Appointment id must be provided.")
+            End If
 
-            Dim command = Await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(False)
-            Using command
-                AddParameter(command, "@id", id)
-                Dim reader = Await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(False)
-                Using reader
-                    If Not Await reader.ReadAsync(cancellationToken).ConfigureAwait(False) Then
-                        Return Nothing
-                    End If
+            Return ExecuteDbOperationAsync(Of Appointment)(
+                "Vast.AppointmentAdapter.GetById",
+                Async Function(ct)
+                    Dim fieldMap = FieldMap.GetTargets("Appointment", AppointmentProjectionFields)
+                    Dim source = FieldMap.GetEntitySource("Appointment")
+                    Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
+                    Dim commandText = $"SELECT {selectClause} FROM {source} WHERE {fieldMap("Id")} = @id"
 
-                    Return ReadAppointment(reader)
-                End Using
-            End Using
+                    Dim command = Await CreateCommandAsync(commandText, ct).ConfigureAwait(False)
+                    Using command
+                        AddParameter(command, "@id", id)
+                        Dim reader = Await command.ExecuteReaderAsync(ct).ConfigureAwait(False)
+                        Using reader
+                            If Not Await reader.ReadAsync(ct).ConfigureAwait(False) Then
+                                Return Nothing
+                            End If
+                            Return ReadAppointment(reader)
+                        End Using
+                    End Using
+                End Function,
+                cancellationToken)
         End Function
 
         ''' <inheritdoc />
-        Public Async Function GetByDateAsync([date] As DateTime, maxResults As Integer, Optional cancellationToken As CancellationToken = Nothing) As Task(Of IReadOnlyCollection(Of Appointment)) Implements IAppointmentAdapter.GetByDateAsync
-            Dim limit = Math.Min(_defaultListLimit, If(maxResults > 0, maxResults, _defaultListLimit))
-            Dim fieldMap = Me.FieldMap.GetTargets("Appointment", AppointmentProjectionFields)
-            Dim source = Me.FieldMap.GetEntitySource("Appointment")
-            Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
-            Dim startField = fieldMap("Start")
+        Public Function GetByDateAsync([date] As DateTime, maxResults As Integer, Optional cancellationToken As CancellationToken = Nothing) As Task(Of IReadOnlyCollection(Of Appointment)) Implements IAppointmentAdapter.GetByDateAsync
+            Dim limit = EnforceLimit(maxResults, _defaultListLimit, NameOf(maxResults))
             Dim startOfDay = [date].Date
             Dim endOfDay = startOfDay.AddDays(1)
-            Dim commandText = $"SELECT TOP (@limit) {selectClause} FROM {source} WHERE {startField} >= @start AND {startField} < @end ORDER BY {startField}"
 
-            Dim command = Await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(False)
-            Using command
-                AddParameter(command, "@limit", limit, DbType.Int32)
-                AddParameter(command, "@start", startOfDay, DbType.DateTime2)
-                AddParameter(command, "@end", endOfDay, DbType.DateTime2)
-                Dim appointments As New List(Of Appointment)()
-                Dim reader = Await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(False)
-                Using reader
-                    While Await reader.ReadAsync(cancellationToken).ConfigureAwait(False)
-                        appointments.Add(ReadAppointment(reader))
-                    End While
-                End Using
+            Return ExecuteDbOperationAsync(Of IReadOnlyCollection(Of Appointment))(
+                "Vast.AppointmentAdapter.GetByDate",
+                Async Function(ct)
+                    Dim fieldMap = FieldMap.GetTargets("Appointment", AppointmentProjectionFields)
+                    Dim source = FieldMap.GetEntitySource("Appointment")
+                    Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
+                    Dim startField = fieldMap("Start")
+                    Dim commandText = $"SELECT TOP (@limit) {selectClause} FROM {source} WHERE {startField} >= @start AND {startField} < @end ORDER BY {startField}"
 
-                Return New ReadOnlyCollection(Of Appointment)(appointments)
-            End Using
+                    Dim command = Await CreateCommandAsync(commandText, ct).ConfigureAwait(False)
+                    Using command
+                        AddParameter(command, "@limit", limit, DbType.Int32)
+                        AddParameter(command, "@start", startOfDay, DbType.DateTime2)
+                        AddParameter(command, "@end", endOfDay, DbType.DateTime2)
+
+                        Dim appointments As New List(Of Appointment)()
+                        Dim reader = Await command.ExecuteReaderAsync(ct).ConfigureAwait(False)
+                        Using reader
+                            While Await reader.ReadAsync(ct).ConfigureAwait(False)
+                                appointments.Add(ReadAppointment(reader))
+                            End While
+                        End Using
+
+                        Return CType(New ReadOnlyCollection(Of Appointment)(appointments), IReadOnlyCollection(Of Appointment))
+                    End Using
+                End Function,
+                cancellationToken)
         End Function
 
         Private Shared Function ReadAppointment(reader As DbDataReader) As Appointment

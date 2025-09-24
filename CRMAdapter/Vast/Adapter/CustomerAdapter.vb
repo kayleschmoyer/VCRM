@@ -1,7 +1,8 @@
 '-----------------------------------------------------------------------
 ' File: CustomerAdapter.vb
-' Role: Implements the canonical customer adapter for the VAST Desktop backend.
-' Architectural Purpose: Normalizes legacy SQL Server data to the canonical CRM customer aggregate.
+' Purpose: Implements the canonical customer adapter for the VAST Desktop backend.
+' Security Considerations: Validates all input, enforces rate limiting, parameterizes SQL, and wraps database exceptions to prevent sensitive leakage to COM callers.
+' Example Usage: `Dim customer = Await adapter.GetByIdAsync(customerId, CancellationToken.None)`
 '-----------------------------------------------------------------------
 Option Strict On
 Option Explicit On
@@ -17,6 +18,7 @@ Imports System.Threading.Tasks
 Imports CRMAdapter.CommonConfig
 Imports CRMAdapter.CommonContracts
 Imports CRMAdapter.CommonDomain
+Imports CRMAdapter.CommonInfrastructure
 
 Namespace CRMAdapter.Vast.Adapter
     ''' <summary>
@@ -28,6 +30,7 @@ Namespace CRMAdapter.Vast.Adapter
 
         Private Const DefaultSearchLimit As Integer = 50
         Private Const DefaultListLimit As Integer = 100
+        Private Const MaxNameQueryLength As Integer = 128
 
         Private Shared ReadOnly RequiredCustomerKeys As String() = {
             "Customer.__source",
@@ -70,136 +73,180 @@ Namespace CRMAdapter.Vast.Adapter
         ''' <summary>
         ''' Initializes a new instance of the <see cref="CustomerAdapter"/> class.
         ''' </summary>
-        Public Sub New(connection As DbConnection, fieldMap As FieldMap, Optional defaultSearchLimit As Integer = DefaultSearchLimit, Optional defaultListLimit As Integer = DefaultListLimit)
-            MyBase.New(connection, fieldMap)
+        Public Sub New(
+            connection As DbConnection,
+            fieldMap As FieldMap,
+            Optional retryPolicy As ISqlRetryPolicy = Nothing,
+            Optional logger As IAdapterLogger = Nothing,
+            Optional rateLimiter As IAdapterRateLimiter = Nothing,
+            Optional defaultSearchLimit As Integer = DefaultSearchLimit,
+            Optional defaultListLimit As Integer = DefaultListLimit)
+            MyBase.New(connection, fieldMap, retryPolicy, logger, rateLimiter)
+            If defaultSearchLimit <= 0 Then
+                Throw New ArgumentOutOfRangeException(NameOf(defaultSearchLimit), "Default search limit must be positive.")
+            End If
+
+            If defaultListLimit <= 0 Then
+                Throw New ArgumentOutOfRangeException(NameOf(defaultListLimit), "Default list limit must be positive.")
+            End If
+
             _defaultSearchLimit = defaultSearchLimit
             _defaultListLimit = defaultListLimit
             MappingValidator.EnsureMappings(fieldMap, RequiredCustomerKeys, NameOf(CustomerAdapter))
             MappingValidator.EnsureMappings(fieldMap, RequiredVehicleReferenceKeys, NameOf(CustomerAdapter))
+            MappingValidator.EnsureEntitySources(fieldMap, New String() {"Customer", "Vehicle"}, NameOf(CustomerAdapter))
         End Sub
 
         ''' <inheritdoc />
-        Public Async Function GetByIdAsync(id As Guid, Optional cancellationToken As CancellationToken = Nothing) As Task(Of Customer) Implements ICustomerAdapter.GetByIdAsync
-            Dim fieldMap = Me.FieldMap.GetTargets("Customer", CustomerProjectionFields)
-            Dim source = Me.FieldMap.GetEntitySource("Customer")
-            Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
-            Dim commandText = $"SELECT {selectClause} FROM {source} WHERE {fieldMap("Id")} = @id"
+        Public Function GetByIdAsync(id As Guid, Optional cancellationToken As CancellationToken = Nothing) As Task(Of Customer) Implements ICustomerAdapter.GetByIdAsync
+            If id = Guid.Empty Then
+                Throw New InvalidAdapterRequestException("Customer id must be provided.")
+            End If
 
-            Dim command = Await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(False)
-            Using command
-                AddParameter(command, "@id", id)
-                Dim reader = Await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(False)
-                Using reader
-                    If Not Await reader.ReadAsync(cancellationToken).ConfigureAwait(False) Then
-                        Return Nothing
-                    End If
+            Return ExecuteDbOperationAsync(Of Customer)(
+                "Vast.CustomerAdapter.GetById",
+                Async Function(ct)
+                    Dim fieldMap = FieldMap.GetTargets("Customer", CustomerProjectionFields)
+                    Dim source = FieldMap.GetEntitySource("Customer")
+                    Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
+                    Dim commandText = $"SELECT {selectClause} FROM {source} WHERE {fieldMap("Id")} = @id"
 
-                    Dim snapshot = ReadCustomerSnapshot(reader)
-                    Dim vehicleLookup = Await LoadVehicleReferencesAsync(New Guid() {snapshot.Id}, cancellationToken).ConfigureAwait(False)
-                    Dim vehicles As IReadOnlyCollection(Of VehicleReference) = Nothing
-                    If Not vehicleLookup.TryGetValue(snapshot.Id, vehicles) Then
-                        vehicles = Array.Empty(Of VehicleReference)()
-                    End If
-                    Return snapshot.ToCustomer(vehicles)
-                End Using
-            End Using
+                    Dim command = Await CreateCommandAsync(commandText, ct).ConfigureAwait(False)
+                    Using command
+                        AddParameter(command, "@id", id)
+
+                        Dim reader = Await command.ExecuteReaderAsync(ct).ConfigureAwait(False)
+                        Using reader
+                            If Not Await reader.ReadAsync(ct).ConfigureAwait(False) Then
+                                Return Nothing
+                            End If
+
+                            Dim snapshot = ReadCustomerSnapshot(reader)
+                            Dim vehicleLookup = Await LoadVehicleReferencesAsync(New Guid() {snapshot.Id}, ct).ConfigureAwait(False)
+                            Dim vehicles As IReadOnlyCollection(Of VehicleReference) = Nothing
+                            If Not vehicleLookup.TryGetValue(snapshot.Id, vehicles) Then
+                                vehicles = Array.Empty(Of VehicleReference)()
+                            End If
+                            Return snapshot.ToCustomer(vehicles)
+                        End Using
+                    End Using
+                End Function,
+                cancellationToken)
         End Function
 
         ''' <inheritdoc />
-        Public Async Function SearchByNameAsync(nameQuery As String, maxResults As Integer, Optional cancellationToken As CancellationToken = Nothing) As Task(Of IReadOnlyCollection(Of Customer)) Implements ICustomerAdapter.SearchByNameAsync
-            If String.IsNullOrWhiteSpace(nameQuery) Then
-                Throw New ArgumentException("Name query must be supplied.", NameOf(nameQuery))
-            End If
+        Public Function SearchByNameAsync(nameQuery As String, maxResults As Integer, Optional cancellationToken As CancellationToken = Nothing) As Task(Of IReadOnlyCollection(Of Customer)) Implements ICustomerAdapter.SearchByNameAsync
+            Dim sanitizedQuery = SanitizeNameQuery(nameQuery)
+            Dim limit = EnforceLimit(maxResults, _defaultSearchLimit, NameOf(maxResults))
 
-            Dim limit = Math.Min(_defaultSearchLimit, If(maxResults > 0, maxResults, _defaultSearchLimit))
-            Dim fieldMap = Me.FieldMap.GetTargets("Customer", CustomerProjectionFields)
-            Dim source = Me.FieldMap.GetEntitySource("Customer")
-            Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
-            Dim commandText = $"SELECT TOP (@limit) {selectClause} FROM {source} WHERE {fieldMap("Name")} LIKE @name ORDER BY {fieldMap("Name")}"
+            Return ExecuteDbOperationAsync(Of IReadOnlyCollection(Of Customer))(
+                "Vast.CustomerAdapter.SearchByName",
+                Async Function(ct)
+                    Dim fieldMap = FieldMap.GetTargets("Customer", CustomerProjectionFields)
+                    Dim source = FieldMap.GetEntitySource("Customer")
+                    Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
+                    Dim commandText = $"SELECT TOP (@limit) {selectClause} FROM {source} WHERE {fieldMap("Name")} LIKE @name ORDER BY {fieldMap("Name")}"
 
-            Dim command = Await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(False)
-            Using command
-                AddParameter(command, "@limit", limit, DbType.Int32)
-                AddParameter(command, "@name", $"%{nameQuery}%")
+                    Dim command = Await CreateCommandAsync(commandText, ct).ConfigureAwait(False)
+                    Using command
+                        AddParameter(command, "@limit", limit, DbType.Int32)
+                        AddParameter(command, "@name", $"%{sanitizedQuery}%")
 
-                Dim snapshots = Await ReadSnapshotsAsync(command, cancellationToken).ConfigureAwait(False)
-                Dim vehicleLookup = Await LoadVehicleReferencesAsync(snapshots.Select(Function(s) s.Id), cancellationToken).ConfigureAwait(False)
+                        Dim snapshots = Await ReadSnapshotsAsync(command, ct).ConfigureAwait(False)
+                        Dim vehicleLookup = Await LoadVehicleReferencesAsync(snapshots.Select(Function(s) s.Id), ct).ConfigureAwait(False)
 
-                Dim customers = snapshots.Select(Function(snapshot)
-                                                     Dim vehicles As IReadOnlyCollection(Of VehicleReference) = Nothing
-                                                     If Not vehicleLookup.TryGetValue(snapshot.Id, vehicles) Then
-                                                         vehicles = Array.Empty(Of VehicleReference)()
-                                                     End If
-                                                     Return snapshot.ToCustomer(vehicles)
-                                                 End Function).ToList()
-                Return New ReadOnlyCollection(Of Customer)(customers)
-            End Using
+                        Dim customers = snapshots.Select(Function(snapshot)
+                                                             Dim vehicles As IReadOnlyCollection(Of VehicleReference) = Nothing
+                                                             If Not vehicleLookup.TryGetValue(snapshot.Id, vehicles) Then
+                                                                 vehicles = Array.Empty(Of VehicleReference)()
+                                                             End If
+                                                             Return snapshot.ToCustomer(vehicles)
+                                                         End Function).ToList()
+                        Return CType(New ReadOnlyCollection(Of Customer)(customers), IReadOnlyCollection(Of Customer))
+                    End Using
+                End Function,
+                cancellationToken)
         End Function
 
         ''' <inheritdoc />
-        Public Async Function GetRecentCustomersAsync(maxResults As Integer, Optional cancellationToken As CancellationToken = Nothing) As Task(Of IReadOnlyCollection(Of Customer)) Implements ICustomerAdapter.GetRecentCustomersAsync
-            Dim limit = Math.Min(_defaultListLimit, If(maxResults > 0, maxResults, _defaultListLimit))
-            Dim fieldMap = Me.FieldMap.GetTargets("Customer", CustomerProjectionFields)
-            Dim source = Me.FieldMap.GetEntitySource("Customer")
-            Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
-            Dim modifiedOnField = Me.FieldMap.GetTarget("Customer.ModifiedOn")
-            Dim commandText = $"SELECT TOP (@limit) {selectClause} FROM {source} ORDER BY {modifiedOnField} DESC"
+        Public Function GetRecentCustomersAsync(maxResults As Integer, Optional cancellationToken As CancellationToken = Nothing) As Task(Of IReadOnlyCollection(Of Customer)) Implements ICustomerAdapter.GetRecentCustomersAsync
+            Dim limit = EnforceLimit(maxResults, _defaultListLimit, NameOf(maxResults))
 
-            Dim command = Await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(False)
-            Using command
-                AddParameter(command, "@limit", limit, DbType.Int32)
-                Dim snapshots = Await ReadSnapshotsAsync(command, cancellationToken).ConfigureAwait(False)
-                Dim vehicleLookup = Await LoadVehicleReferencesAsync(snapshots.Select(Function(s) s.Id), cancellationToken).ConfigureAwait(False)
+            Return ExecuteDbOperationAsync(Of IReadOnlyCollection(Of Customer))(
+                "Vast.CustomerAdapter.GetRecent",
+                Async Function(ct)
+                    Dim fieldMap = FieldMap.GetTargets("Customer", CustomerProjectionFields)
+                    Dim source = FieldMap.GetEntitySource("Customer")
+                    Dim selectClause = String.Join(", ", fieldMap.Select(Function(kvp) $"{kvp.Value} AS [{kvp.Key}]"))
+                    Dim modifiedOnField = FieldMap.GetTarget("Customer.ModifiedOn")
+                    Dim commandText = $"SELECT TOP (@limit) {selectClause} FROM {source} ORDER BY {modifiedOnField} DESC"
 
-                Dim customers = snapshots.Select(Function(snapshot)
-                                                     Dim vehicles As IReadOnlyCollection(Of VehicleReference) = Nothing
-                                                     If Not vehicleLookup.TryGetValue(snapshot.Id, vehicles) Then
-                                                         vehicles = Array.Empty(Of VehicleReference)()
-                                                     End If
-                                                     Return snapshot.ToCustomer(vehicles)
-                                                 End Function).ToList()
-                Return New ReadOnlyCollection(Of Customer)(customers)
-            End Using
+                    Dim command = Await CreateCommandAsync(commandText, ct).ConfigureAwait(False)
+                    Using command
+                        AddParameter(command, "@limit", limit, DbType.Int32)
+                        Dim snapshots = Await ReadSnapshotsAsync(command, ct).ConfigureAwait(False)
+                        Dim vehicleLookup = Await LoadVehicleReferencesAsync(snapshots.Select(Function(s) s.Id), ct).ConfigureAwait(False)
+
+                        Dim customers = snapshots.Select(Function(snapshot)
+                                                             Dim vehicles As IReadOnlyCollection(Of VehicleReference) = Nothing
+                                                             If Not vehicleLookup.TryGetValue(snapshot.Id, vehicles) Then
+                                                                 vehicles = Array.Empty(Of VehicleReference)()
+                                                             End If
+                                                             Return snapshot.ToCustomer(vehicles)
+                                                         End Function).ToList()
+                        Return CType(New ReadOnlyCollection(Of Customer)(customers), IReadOnlyCollection(Of Customer))
+                    End Using
+                End Function,
+                cancellationToken)
         End Function
 
-        Private Async Function LoadVehicleReferencesAsync(customerIds As IEnumerable(Of Guid), cancellationToken As CancellationToken) As Task(Of IReadOnlyDictionary(Of Guid, IReadOnlyCollection(Of VehicleReference)))
-            Dim idList = customerIds.Distinct().ToList()
-            If idList.Count = 0 Then
-                Return New Dictionary(Of Guid, IReadOnlyCollection(Of VehicleReference))()
+        Private Function LoadVehicleReferencesAsync(customerIds As IEnumerable(Of Guid), cancellationToken As CancellationToken) As Task(Of IReadOnlyDictionary(Of Guid, IReadOnlyCollection(Of VehicleReference)))
+            If customerIds Is Nothing Then
+                Throw New ArgumentNullException(NameOf(customerIds))
             End If
 
-            Dim fields = Me.FieldMap.GetTargets("Vehicle", New String() {"Id", "Vin", "CustomerId"})
-            Dim source = Me.FieldMap.GetEntitySource("Vehicle")
-            Dim parameterNames = idList.Select(Function(_, index) $"@c{index}").ToArray()
-            Dim selectClause = $"{fields("Id")} AS [VehicleId], {fields("Vin")} AS [Vin], {fields("CustomerId")} AS [CustomerId]"
-            Dim commandText = $"SELECT {selectClause} FROM {source} WHERE {fields("CustomerId")} IN ({String.Join(", ", parameterNames)})"
+            Return ExecuteDbOperationAsync(Of IReadOnlyDictionary(Of Guid, IReadOnlyCollection(Of VehicleReference)))(
+                "Vast.CustomerAdapter.LoadVehicleReferences",
+                Async Function(ct)
+                    Dim idList = customerIds.Distinct().Where(Function(id) id <> Guid.Empty).ToList()
+                    If idList.Count = 0 Then
+                        Return CType(New Dictionary(Of Guid, IReadOnlyCollection(Of VehicleReference))(), IReadOnlyDictionary(Of Guid, IReadOnlyCollection(Of VehicleReference)))
+                    End If
 
-            Dim command = Await CreateCommandAsync(commandText, cancellationToken).ConfigureAwait(False)
-            Using command
-                For i = 0 To idList.Count - 1
-                    AddParameter(command, parameterNames(i), idList(i))
-                Next
+                    Dim fields = FieldMap.GetTargets("Vehicle", New String() {"Id", "Vin", "CustomerId"})
+                    Dim source = FieldMap.GetEntitySource("Vehicle")
+                    Dim parameterNames = idList.Select(Function(_, index) $"@c{index}").ToArray()
+                    Dim selectClause = $"{fields("Id")} AS [VehicleId], {fields("Vin")} AS [Vin], {fields("CustomerId")} AS [CustomerId]"
+                    Dim commandText = $"SELECT {selectClause} FROM {source} WHERE {fields("CustomerId")} IN ({String.Join(", ", parameterNames)})"
 
-                Dim accumulator As New Dictionary(Of Guid, List(Of VehicleReference))()
-                Dim reader = Await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(False)
-                Using reader
-                    While Await reader.ReadAsync(cancellationToken).ConfigureAwait(False)
-                        Dim customerId = reader.GetGuid(reader.GetOrdinal("CustomerId"))
-                        Dim vehicleId = reader.GetGuid(reader.GetOrdinal("VehicleId"))
-                        Dim vin = reader.GetString(reader.GetOrdinal("Vin"))
+                    Dim command = Await CreateCommandAsync(commandText, ct).ConfigureAwait(False)
+                    Using command
+                        For i = 0 To idList.Count - 1
+                            AddParameter(command, parameterNames(i), idList(i))
+                        Next
 
-                        Dim vehicles As List(Of VehicleReference) = Nothing
-                        If Not accumulator.TryGetValue(customerId, vehicles) Then
-                            vehicles = New List(Of VehicleReference)()
-                            accumulator(customerId) = vehicles
-                        End If
+                        Dim accumulator As New Dictionary(Of Guid, List(Of VehicleReference))()
+                        Dim reader = Await command.ExecuteReaderAsync(ct).ConfigureAwait(False)
+                        Using reader
+                            While Await reader.ReadAsync(ct).ConfigureAwait(False)
+                                Dim customerId = reader.GetGuid(reader.GetOrdinal("CustomerId"))
+                                Dim vehicleId = reader.GetGuid(reader.GetOrdinal("VehicleId"))
+                                Dim vin = reader.GetString(reader.GetOrdinal("Vin"))
 
-                        vehicles.Add(New VehicleReference(vehicleId, vin))
-                    End While
-                End Using
+                                Dim vehicles As List(Of VehicleReference) = Nothing
+                                If Not accumulator.TryGetValue(customerId, vehicles) Then
+                                    vehicles = New List(Of VehicleReference)()
+                                    accumulator(customerId) = vehicles
+                                End If
 
-                Return accumulator.ToDictionary(Function(pair) pair.Key, Function(pair) CType(pair.Value.AsReadOnly(), IReadOnlyCollection(Of VehicleReference)))
-            End Using
+                                vehicles.Add(New VehicleReference(vehicleId, vin))
+                            End While
+                        End Using
+
+                        Return CType(accumulator.ToDictionary(Function(pair) pair.Key, Function(pair) CType(pair.Value.AsReadOnly(), IReadOnlyCollection(Of VehicleReference))), IReadOnlyDictionary(Of Guid, IReadOnlyCollection(Of VehicleReference)))
+                    End Using
+                End Function,
+                cancellationToken)
         End Function
 
         Private Shared Async Function ReadSnapshotsAsync(command As DbCommand, cancellationToken As CancellationToken) As Task(Of List(Of CustomerSnapshot))
@@ -226,6 +273,19 @@ Namespace CRMAdapter.Vast.Adapter
                 reader.GetString(reader.GetOrdinal("State")),
                 reader.GetString(reader.GetOrdinal("PostalCode")),
                 reader.GetString(reader.GetOrdinal("Country")))
+        End Function
+
+        Private Shared Function SanitizeNameQuery(nameQuery As String) As String
+            If String.IsNullOrWhiteSpace(nameQuery) Then
+                Throw New InvalidAdapterRequestException("Name query must be supplied.")
+            End If
+
+            Dim trimmed = nameQuery.Trim()
+            If trimmed.Length > MaxNameQueryLength Then
+                Throw New InvalidAdapterRequestException($"Name query cannot exceed {MaxNameQueryLength} characters.")
+            End If
+
+            Return trimmed
         End Function
 
         Private NotInheritable Class CustomerSnapshot
