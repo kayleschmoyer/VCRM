@@ -118,7 +118,7 @@ public static class CustomersEndpoint
         var normalizedMax = Math.Clamp(request.MaxResults ?? DefaultMaxResults, 1, MaxAllowedResults);
         var normalizedQuery = request.Query.Trim();
         var logger = loggerFactory.CreateLogger(typeof(CustomersEndpoint));
-        logger.LogInformation("Executing customer search for '{Query}' with limit {Limit}.", normalizedQuery, normalizedMax);
+        logger.LogInformation("Executing customer search with limit {Limit}.", normalizedMax);
 
         var results = await adapter.SearchByNameAsync(normalizedQuery, normalizedMax, cancellationToken).ConfigureAwait(false);
         return TypedResults.Ok(results);

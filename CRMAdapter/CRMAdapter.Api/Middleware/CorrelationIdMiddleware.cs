@@ -80,10 +80,13 @@ public sealed class CorrelationIdMiddleware
 
     private static string ResolveCorrelationId(HttpContext context)
     {
-        if (context.Request.Headers.TryGetValue(CorrelationHeaderName, out var headerValues)
-            && !string.IsNullOrWhiteSpace(headerValues))
+        if (context.Request.Headers.TryGetValue(CorrelationHeaderName, out var headerValues))
         {
-            return headerValues.ToString();
+            var candidate = headerValues.ToString().Trim();
+            if (Guid.TryParse(candidate, out var parsed))
+            {
+                return parsed.ToString("N");
+            }
         }
 
         return Guid.NewGuid().ToString("N");
