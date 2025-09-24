@@ -1,0 +1,58 @@
+{
+  "backendName": "VAST Online",
+  "mappings": {
+    "Customer": {
+      "__source": "[crm].[Customer]",
+      "Id": "[crm].[Customer].[CustomerGuid]",
+      "Name": "[crm].[Customer].[DisplayName]",
+      "Email": "[crm].[Customer].[EmailPrimary]",
+      "Phone": "[crm].[Customer].[PhonePrimary]",
+      "AddressLine1": "[crm].[Customer].[AddressLine1]",
+      "AddressLine2": "[crm].[Customer].[AddressLine2]",
+      "City": "[crm].[Customer].[City]",
+      "State": "[crm].[Customer].[StateProvince]",
+      "PostalCode": "[crm].[Customer].[PostalCode]",
+      "Country": "[crm].[Customer].[CountryCode]",
+      "ModifiedOn": "[crm].[Customer].[ModifiedUtc]"
+    },
+    "Vehicle": {
+      "__source": "[crm].[Vehicle]",
+      "Id": "[crm].[Vehicle].[VehicleGuid]",
+      "CustomerId": "[crm].[Vehicle].[CustomerGuid]",
+      "Vin": "[crm].[Vehicle].[Vin]",
+      "Make": "[crm].[Vehicle].[Make]",
+      "Model": "[crm].[Vehicle].[Model]",
+      "ModelYear": "[crm].[Vehicle].[ModelYear]",
+      "Odometer": "[crm].[Vehicle].[OdometerMiles]"
+    },
+    "Invoice": {
+      "__source": "[billing].[Invoice]",
+      "Id": "[billing].[Invoice].[InvoiceGuid]",
+      "CustomerId": "[billing].[Invoice].[CustomerGuid]",
+      "VehicleId": "[billing].[Invoice].[VehicleGuid]",
+      "Number": "[billing].[Invoice].[InvoiceNumber]",
+      "Date": "[billing].[Invoice].[InvoiceDateUtc]",
+      "Total": "[billing].[Invoice].[InvoiceTotal]",
+      "Status": "[billing].[Invoice].[Status]"
+    },
+    "InvoiceLine": {
+      "__source": "[billing].[InvoiceLine]",
+      "InvoiceId": "[billing].[InvoiceLine].[InvoiceGuid]",
+      "Description": "[billing].[InvoiceLine].[Description]",
+      "Quantity": "[billing].[InvoiceLine].[Quantity]",
+      "UnitPrice": "[billing].[InvoiceLine].[UnitPrice]",
+      "Tax": "[billing].[InvoiceLine].[TaxAmount]"
+    },
+    "Appointment": {
+      "__source": "[scheduling].[Appointment]",
+      "Id": "[scheduling].[Appointment].[AppointmentGuid]",
+      "CustomerId": "[scheduling].[Appointment].[CustomerGuid]",
+      "VehicleId": "[scheduling].[Appointment].[VehicleGuid]",
+      "Start": "[scheduling].[Appointment].[StartTimeUtc]",
+      "End": "[scheduling].[Appointment].[EndTimeUtc]",
+      "Advisor": "[scheduling].[Appointment].[AdvisorDisplayName]",
+      "Status": "[scheduling].[Appointment].[Status]",
+      "Location": "[scheduling].[Appointment].[LocationName]"
+    }
+  }
+}
