@@ -2,6 +2,7 @@
 @page "/customers"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
 @inject ICustomerService CustomerDirectory
+@inject CustomerRealtimeService CustomerRealtime
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-customers-container">
@@ -31,7 +32,7 @@
                   RowsPerPageOptions="@_rowsPerPageOptions"
                   @ref="_table"
                   OnRowClick="HandleRowClick"
-                  RowClassFunc="@(_ => \"crm-customer-row\")">
+                  RowClassFunc="ResolveRowClass">
             <ToolBarContent>
                 <MudText Typo="Typo.subtitle1">Directory</MudText>
             </ToolBarContent>
@@ -93,23 +94,33 @@
 
 @code {
     private readonly int[] _rowsPerPageOptions = { 10, 25, 50 };
-    private IReadOnlyList<CustomerSummary> _allCustomers = Array.Empty<CustomerSummary>();
+    private List<CustomerSummary> _allCustomers = new();
     private List<CustomerSummary> _filteredCustomers = new();
     private MudTable<CustomerSummary>? _table;
     private int _rowsPerPage = 10;
     private bool _isLoading;
+    private string _currentFilter = string.Empty;
+    private readonly Dictionary<Guid, string> _rowStates = new();
+    private IDisposable? _customerCreatedSubscription;
+    private IDisposable? _customerUpdatedSubscription;
+    private IDisposable? _reconnectedSubscription;
 
     protected override async Task OnInitializedAsync()
     {
         _isLoading = true;
-        _allCustomers = await CustomerDirectory.GetCustomersAsync();
-        _filteredCustomers = _allCustomers.ToList();
+        await ReloadCustomersAsync();
         _isLoading = false;
+
+        await CustomerRealtime.EnsureConnectedAsync();
+        _customerCreatedSubscription = CustomerRealtime.OnCustomerCreated(payload => _ = OnCustomerCreatedAsync(payload));
+        _customerUpdatedSubscription = CustomerRealtime.OnCustomerUpdated(payload => _ = OnCustomerUpdatedAsync(payload));
+        _reconnectedSubscription = CustomerRealtime.RegisterReconnected(() => _ = OnHubReconnectedAsync());
     }
 
     private async Task HandleSearchAsync(string query)
     {
         var sanitized = query?.Trim() ?? string.Empty;
+        _currentFilter = sanitized;
         _filteredCustomers = string.IsNullOrWhiteSpace(sanitized)
             ? _allCustomers.ToList()
             : _allCustomers.Where(customer => Matches(customer, sanitized)).ToList();
@@ -123,11 +134,15 @@
         return HandleSearchAsync(string.Empty);
     }
 
-    private static bool Matches(CustomerSummary customer, string query)
+    private string ResolveRowClass(CustomerSummary summary)
     {
-        return customer.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
-               || customer.Email.Contains(query, StringComparison.OrdinalIgnoreCase)
-               || customer.Phone.Contains(query, StringComparison.OrdinalIgnoreCase);
+        var classes = new List<string> { "crm-customer-row" };
+        if (_rowStates.TryGetValue(summary.Id, out var stateClass))
+        {
+            classes.Add(stateClass);
+        }
+
+        return string.Join(' ', classes);
     }
 
     private void HandleRowClick(TableRowClickEventArgs<CustomerSummary> args)
@@ -143,5 +158,104 @@
     private static string FormatLastInvoiceDate(DateTime? date)
     {
         return date.HasValue ? date.Value.ToString("MMM dd, yyyy") : "—";
+    }
+
+    private static bool Matches(CustomerSummary customer, string query)
+    {
+        return customer.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || customer.Email.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || customer.Phone.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task OnCustomerCreatedAsync(CustomerCreatedEvent payload)
+    {
+        await InvokeAsync(async () =>
+        {
+            var summary = new CustomerSummary(payload.Id, payload.Name, payload.Phone, payload.Email, payload.VehicleCount, payload.LastInvoiceDate);
+            UpsertCustomer(summary);
+            await TriggerRowStateAsync(summary.Id, "crm-customer-row--new").ConfigureAwait(false);
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnCustomerUpdatedAsync(CustomerUpdatedEvent payload)
+    {
+        await InvokeAsync(async () =>
+        {
+            var summary = new CustomerSummary(payload.Id, payload.Name, payload.Phone, payload.Email, payload.VehicleCount, payload.LastInvoiceDate);
+            UpsertCustomer(summary);
+            await TriggerRowStateAsync(summary.Id, "crm-customer-row--updated").ConfigureAwait(false);
+            StateHasChanged();
+        });
+    }
+
+    private Task OnHubReconnectedAsync()
+    {
+        return InvokeAsync(async () =>
+        {
+            await ReloadCustomersAsync().ConfigureAwait(false);
+            StateHasChanged();
+        });
+    }
+
+    private void UpsertCustomer(CustomerSummary summary)
+    {
+        var allIndex = _allCustomers.FindIndex(customer => customer.Id == summary.Id);
+        if (allIndex >= 0)
+        {
+            _allCustomers[allIndex] = summary;
+        }
+        else
+        {
+            _allCustomers.Insert(0, summary);
+        }
+
+        if (string.IsNullOrWhiteSpace(_currentFilter) || Matches(summary, _currentFilter))
+        {
+            var filteredIndex = _filteredCustomers.FindIndex(customer => customer.Id == summary.Id);
+            if (filteredIndex >= 0)
+            {
+                _filteredCustomers[filteredIndex] = summary;
+            }
+            else
+            {
+                _filteredCustomers.Insert(0, summary);
+            }
+        }
+        else
+        {
+            _filteredCustomers.RemoveAll(customer => customer.Id == summary.Id);
+        }
+    }
+
+    private async Task TriggerRowStateAsync(Guid id, string cssClass)
+    {
+        _rowStates[id] = cssClass;
+        await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        await InvokeAsync(() =>
+        {
+            if (_rowStates.TryGetValue(id, out var existing) && existing == cssClass)
+            {
+                _rowStates.Remove(id);
+                StateHasChanged();
+            }
+        }).ConfigureAwait(false);
+    }
+
+    private async Task ReloadCustomersAsync()
+    {
+        var customers = await CustomerDirectory.GetCustomersAsync();
+        _allCustomers = customers.ToList();
+        _filteredCustomers = string.IsNullOrWhiteSpace(_currentFilter)
+            ? _allCustomers.ToList()
+            : _allCustomers.Where(customer => Matches(customer, _currentFilter)).ToList();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _customerCreatedSubscription?.Dispose();
+        _customerUpdatedSubscription?.Dispose();
+        _reconnectedSubscription?.Dispose();
+        await Task.CompletedTask;
     }
 }

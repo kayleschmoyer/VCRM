@@ -17,6 +17,7 @@ using CRMAdapter.UI.Services.Mock.Customers;
 using CRMAdapter.UI.Services.Mock.Dashboard;
 using CRMAdapter.UI.Services.Mock.Invoices;
 using CRMAdapter.UI.Services.Mock.Vehicles;
+using CRMAdapter.UI.Services.Realtime;
 using CRMAdapter.UI.Theming;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -112,6 +113,13 @@ builder.Services.AddScoped<IVehicleService>(sp => sp.GetRequiredService<IDataSou
 builder.Services.AddScoped<IInvoiceService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IInvoiceService>());
 builder.Services.AddScoped<IAppointmentService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IAppointmentService>());
 builder.Services.AddScoped<IDashboardService>(sp => sp.GetRequiredService<IDataSourceStrategy>().GetService<IDashboardService>());
+
+builder.Services.AddSingleton<IHubConnectionProxyFactory, SignalRHubConnectionProxyFactory>();
+builder.Services.AddScoped<RealtimeHubConnection>();
+builder.Services.AddScoped<CustomerRealtimeService>();
+builder.Services.AddScoped<InvoiceRealtimeService>();
+builder.Services.AddScoped<VehicleRealtimeService>();
+builder.Services.AddScoped<AppointmentRealtimeService>();
 
 builder.Services.AddMudServices(config =>
 {

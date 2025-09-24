@@ -2,6 +2,11 @@
 @page "/dashboard"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
 @inject IDashboardService Analytics
+@inject CustomerRealtimeService CustomerRealtime
+@inject InvoiceRealtimeService InvoiceRealtime
+@inject VehicleRealtimeService VehicleRealtime
+@inject AppointmentRealtimeService AppointmentRealtime
+@implements IAsyncDisposable
 
 <MudStack Spacing="3" Class="crm-dashboard-overview">
     <MudStack Spacing="0.5">
@@ -89,11 +94,24 @@
     private IReadOnlyList<ChartSeries> _statusSeries = Array.Empty<ChartSeries>();
     private IReadOnlyList<string> _vehiclesServicedLabels = Array.Empty<string>();
     private IReadOnlyList<ChartSeries> _vehiclesServicedSeries = Array.Empty<ChartSeries>();
+    private readonly List<IDisposable> _subscriptions = new();
 
     protected override async Task OnInitializedAsync()
     {
         _snapshot = await Analytics.GetSnapshotAsync();
         BuildCharts();
+
+        await CustomerRealtime.EnsureConnectedAsync();
+        await InvoiceRealtime.EnsureConnectedAsync();
+        await VehicleRealtime.EnsureConnectedAsync();
+        await AppointmentRealtime.EnsureConnectedAsync();
+
+        _subscriptions.Add(CustomerRealtime.OnCustomerCreated(_ => _ = RefreshSnapshotAsync()));
+        _subscriptions.Add(CustomerRealtime.OnCustomerUpdated(_ => _ = RefreshSnapshotAsync()));
+        _subscriptions.Add(InvoiceRealtime.OnInvoiceCreated(_ => _ = RefreshSnapshotAsync()));
+        _subscriptions.Add(InvoiceRealtime.OnInvoicePaid(_ => _ = RefreshSnapshotAsync()));
+        _subscriptions.Add(VehicleRealtime.OnVehicleAdded(_ => _ = RefreshSnapshotAsync()));
+        _subscriptions.Add(AppointmentRealtime.OnAppointmentScheduled(_ => _ = RefreshSnapshotAsync()));
     }
 
     private void BuildCharts()
@@ -132,5 +150,26 @@
                 Data = _snapshot.VehiclesServiced.Select(point => (double)point.CompletedCount).ToArray()
             }
         };
+    }
+
+    private Task RefreshSnapshotAsync()
+    {
+        return InvokeAsync(async () =>
+        {
+            _snapshot = await Analytics.GetSnapshotAsync().ConfigureAwait(false);
+            BuildCharts();
+            StateHasChanged();
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var subscription in _subscriptions)
+        {
+            subscription.Dispose();
+        }
+
+        _subscriptions.Clear();
+        await Task.CompletedTask;
     }
 }

@@ -5,6 +5,8 @@ using System.Data.Common;
 using System.IO;
 using System.IdentityModel.Tokens.Jwt;
 using CRMAdapter.Api.Endpoints;
+using CRMAdapter.Api.Events;
+using CRMAdapter.Api.Hubs;
 using CRMAdapter.Api.Middleware;
 using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
@@ -99,6 +101,11 @@ public sealed class Startup
         services.AddScoped(provider => provider.GetRequiredService<AdapterBundle>().VehicleAdapter);
         services.AddScoped(provider => provider.GetRequiredService<AdapterBundle>().InvoiceAdapter);
         services.AddScoped(provider => provider.GetRequiredService<AdapterBundle>().AppointmentAdapter);
+
+        services.AddSignalR(options =>
+        {
+            options.EnableDetailedErrors = _environment.IsDevelopment();
+        });
     }
 
     /// <summary>
@@ -135,6 +142,9 @@ public sealed class Startup
         app.MapVehiclesEndpoints();
         app.MapInvoicesEndpoints();
         app.MapAppointmentsEndpoints();
+        app.MapHub<CrmEventsHub>("/crmhub");
+
+        EventDispatcher.Configure(app.Services);
     }
 
     private void ConfigureSwagger(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)

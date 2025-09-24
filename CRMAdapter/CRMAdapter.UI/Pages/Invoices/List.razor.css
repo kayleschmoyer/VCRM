@@ -16,8 +16,38 @@
     background-color: rgba(211, 47, 47, 0.08);
 }
 
+.crm-invoice-row--new {
+    animation: crm-invoice-slide-in 0.35s ease-out, crm-invoice-flash 2.5s ease-out;
+}
+
+.crm-invoice-row--paid {
+    animation: crm-invoice-flash 2.5s ease-out;
+}
+
 .crm-balance-danger {
     color: var(--mud-palette-error);
     font-weight: 600;
+}
+
+@keyframes crm-invoice-slide-in {
+    from {
+        transform: translateY(-8px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes crm-invoice-flash {
+    from {
+        background-color: rgba(46, 125, 50, 0.16);
+    }
+
+    to {
+        background-color: transparent;
+    }
 }
 
