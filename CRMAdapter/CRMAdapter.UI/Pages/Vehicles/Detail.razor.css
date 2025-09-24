@@ -1,12 +1,18 @@
-/* Detail.razor.css: Styles the responsive customer detail 360 workspace. */
-.crm-customer-detail {
+/* Detail.razor.css: Styles the vehicle detail dual-column layout and supporting panels. */
+.crm-vehicle-detail {
     max-width: 1240px;
     margin: 0 auto;
     padding-bottom: 3rem;
 }
 
-.crm-health-chip {
+.crm-detail-chip {
     font-weight: 600;
+}
+
+.crm-vehicle-notes {
+    padding: 1rem;
+    border-radius: 12px;
+    background-color: rgba(54, 97, 255, 0.08);
 }
 
 .crm-detail-tabs {
@@ -22,20 +28,8 @@
     padding: 0;
 }
 
-.crm-detail-tabs .mud-table {
-    border-radius: 12px;
-}
-
-.crm-detail-tabs .crm-vehicle-row {
-    cursor: pointer;
-}
-
-.crm-detail-tabs .mud-table tr:hover {
-    background-color: rgba(54, 97, 255, 0.06);
-}
-
 @media (max-width: 959.95px) {
-    .crm-customer-detail {
+    .crm-vehicle-detail {
         padding-inline: 1rem;
     }
 

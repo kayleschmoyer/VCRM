@@ -1,0 +1,64 @@
+/* List.razor.css: Styles the vehicle fleet workspace with adaptive layouts and elevated surfaces. */
+.crm-vehicles-container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.crm-page-title {
+    letter-spacing: -0.01em;
+}
+
+.crm-page-subtitle {
+    color: rgba(71, 85, 105, 0.85);
+}
+
+.crm-search-shell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
+}
+
+.crm-table-shell {
+    border-radius: 20px;
+    padding: 1.5rem;
+}
+
+.crm-table-shell .mud-table {
+    border-radius: 12px;
+}
+
+.crm-vehicle-row {
+    cursor: pointer;
+}
+
+.crm-status-chip {
+    font-weight: 600;
+    max-width: fit-content;
+}
+
+.crm-result-count {
+    font-weight: 600;
+}
+
+@media (max-width: 959.95px) {
+    .crm-vehicles-container {
+        padding-inline: 1rem;
+    }
+
+    .crm-table-shell {
+        padding: 1rem;
+    }
+
+    .crm-search-shell {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .crm-result-count {
+        align-self: flex-start;
+    }
+}

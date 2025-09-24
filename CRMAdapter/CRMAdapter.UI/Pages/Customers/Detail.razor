@@ -56,7 +56,12 @@
                 <MudPaper Elevation="1" Class="crm-detail-tabs">
                     <MudTabs Rounded="true" ApplyEffects="true" KeepPanelsAlive="true">
                         <MudTabPanel Text="Vehicles" Icon="@Icons.Material.Filled.DirectionsCar">
-                            <MudTable Items="@_customer.Vehicles" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                            <MudTable Items="@_customer.Vehicles"
+                                      Dense="true"
+                                      Hover="true"
+                                      Breakpoint="Breakpoint.Sm"
+                                      OnRowClick="NavigateToVehicle"
+                                      RowClassFunc="@(_ => \"crm-vehicle-row\")">
                                 <HeaderContent>
                                     <MudTh>VIN</MudTh>
                                     <MudTh>Year</MudTh>
@@ -68,7 +73,7 @@
                                     <MudTd DataLabel="Year">@context.Year</MudTd>
                                     <MudTd DataLabel="Model">@context.MakeModel</MudTd>
                                     <MudTd DataLabel="Status">
-                                        <MudChip Color="@ResolveStatusColor(context.Status)" Variant="Variant.Filled" Size="Size.Small">@context.Status</MudChip>
+                                        <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Filled" Size="Size.Small">@context.Status</MudChip>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -86,7 +91,7 @@
                                     <MudTd DataLabel="Date">@context.IssuedOn.ToString("MMM dd, yyyy")</MudTd>
                                     <MudTd DataLabel="Amount">@FormatCurrency(context.Amount)</MudTd>
                                     <MudTd DataLabel="Status">
-                                        <MudChip Color="@ResolveStatusColor(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                                        <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -104,7 +109,7 @@
                                     <MudTd DataLabel="Subject">@context.Subject</MudTd>
                                     <MudTd DataLabel="Owner">@context.Owner</MudTd>
                                     <MudTd DataLabel="Status">
-                                        <MudChip Color="@ResolveStatusColor(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                                        <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -140,15 +145,8 @@
         return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
     }
 
-    private static Color ResolveStatusColor(string status)
+    private void NavigateToVehicle(TableRowClickEventArgs<VehicleRecord> args)
     {
-        return status switch
-        {
-            "Paid" or "Active" or "Completed" => Color.Success,
-            "Processing" or "Scheduled" or "In service" => Color.Info,
-            "Draft" or "Awaiting parts" or "In diagnostics" => Color.Warning,
-            "Past due" or "Retired" => Color.Error,
-            _ => Color.Default
-        };
+        NavigationManager.NavigateTo($"/vehicles/{args.Item.Id}");
     }
 }

@@ -1,0 +1,93 @@
+@* VehicleCard.razor: Premium summary card for showcasing a vehicle's identity and ownership context. *@
+<MudCard Class="crm-vehicle-card" Elevation="1">
+    <MudCardContent>
+        <MudStack Spacing="1.5">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1.5">
+                <MudAvatar Icon="@Icons.Material.Filled.DirectionsCar"
+                           Size="Size.Large"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Class="crm-vehicle-card-avatar" />
+                <MudStack Spacing="0.5">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudText Typo="Typo.h6" Class="crm-vehicle-card-title">@Year @Make @Model</MudText>
+                        <MudChip Color="@StatusColor" Variant="Variant.Filled" Size="Size.Small" Class="crm-vehicle-card-status">@Status</MudChip>
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0.75" Class="crm-vehicle-card-meta">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0.5">
+                            <MudIcon Icon="@Icons.Material.Filled.ConfirmationNumber" Size="Size.Small" />
+                            <MudText Typo="Typo.caption">VIN @Vin</MudText>
+                        </MudStack>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0.5">
+                            <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Small" />
+                            <MudText Typo="Typo.caption">Plate @Plate</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudStack>
+            </MudStack>
+
+            <MudDivider />
+
+            <MudStack Spacing="0.5">
+                <MudText Typo="Typo.overline">Owned by</MudText>
+                @if (!string.IsNullOrWhiteSpace(OwnerHref))
+                {
+                    <MudLink Href="@OwnerHref" Class="crm-vehicle-card-owner" Color="Color.Primary">
+                        @OwnerName
+                    </MudLink>
+                }
+                else
+                {
+                    <MudText Typo="Typo.subtitle2" Class="crm-vehicle-card-owner">@OwnerName</MudText>
+                }
+                @if (!string.IsNullOrWhiteSpace(OwnerContact))
+                {
+                    <MudText Typo="Typo.caption" Class="mud-secondary-text">@OwnerContact</MudText>
+                }
+            </MudStack>
+
+            @if (ChildContent is not null)
+            {
+                <MudDivider />
+                <MudStack Spacing="1">
+                    @ChildContent
+                </MudStack>
+            }
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter]
+    public string Vin { get; set; } = string.Empty;
+
+    [Parameter]
+    public int Year { get; set; }
+
+    [Parameter]
+    public string Make { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Model { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Plate { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Status { get; set; } = string.Empty;
+
+    [Parameter]
+    public Color StatusColor { get; set; } = Color.Default;
+
+    [Parameter]
+    public string OwnerName { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? OwnerHref { get; set; }
+
+    [Parameter]
+    public string? OwnerContact { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

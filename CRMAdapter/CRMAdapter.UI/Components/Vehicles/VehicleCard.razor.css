@@ -1,0 +1,35 @@
+/* VehicleCard.razor.css: Provides layout, spacing, and typography for vehicle summary cards. */
+.crm-vehicle-card {
+    border-radius: 20px;
+    padding: 1.5rem;
+}
+
+.crm-vehicle-card-avatar {
+    box-shadow: 0 10px 30px rgba(54, 97, 255, 0.25);
+}
+
+.crm-vehicle-card-title {
+    font-weight: 600;
+}
+
+.crm-vehicle-card-status {
+    font-weight: 600;
+}
+
+.crm-vehicle-card-meta {
+    flex-wrap: wrap;
+}
+
+.crm-vehicle-card-meta .mud-icon-root {
+    color: var(--mud-palette-primary);
+}
+
+.crm-vehicle-card-owner {
+    font-weight: 600;
+}
+
+@media (max-width: 599.95px) {
+    .crm-vehicle-card {
+        padding: 1.25rem;
+    }
+}

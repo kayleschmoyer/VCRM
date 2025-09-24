@@ -1,0 +1,144 @@
+@* Detail.razor: Immersive vehicle 360 bringing together identity, owner, and lifecycle history. *@
+@page "/vehicles/{VehicleId:guid}"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject IVehicleRegistry VehicleRegistry
+@inject NavigationManager NavigationManager
+
+<MudStack Spacing="3" Class="crm-vehicle-detail">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Justify="Justify.SpaceBetween">
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="NavigateBack"
+                   Color="Color.Default">
+            Back to vehicles
+        </MudButton>
+        @if (_vehicle is not null)
+        {
+            <MudChip Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Bolt" Class="crm-detail-chip">
+                Last serviced @FormatServiceDate(_vehicle.LastServiceDate)
+            </MudChip>
+        }
+    </MudStack>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="0" Class="pa-6">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else if (_vehicle is null)
+    {
+        <MudPaper Elevation="1" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+            <MudText Typo="Typo.h6">We could not locate that vehicle</MudText>
+            <MudText Typo="Typo.body2" Class="mud-secondary-text">Try launching it from the vehicles workspace or a customer profile.</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-4" OnClick="NavigateBack">Return to vehicles</MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem Xs="12" Lg="5">
+                <VehicleCard Vin="@_vehicle.Vin"
+                             Year="@_vehicle.Year"
+                             Make="@_vehicle.Make"
+                             Model="@_vehicle.Model"
+                             Plate="@_vehicle.Plate"
+                             Status="@_vehicle.Status"
+                             StatusColor="@StatusColorCatalog.Resolve(_vehicle.Status)"
+                             OwnerName="@_vehicle.Owner.Name"
+                             OwnerHref="@GetCustomerUrl(_vehicle.Owner.Id)"
+                             OwnerContact="@_vehicle.Owner.PrimaryContact">
+                    <MudStack Spacing="1.5">
+                        <MudStack Spacing="0.5">
+                            <MudText Typo="Typo.overline">Last service</MudText>
+                            <MudText Typo="Typo.subtitle2">@FormatServiceDate(_vehicle.LastServiceDate)</MudText>
+                        </MudStack>
+                        @if (!string.IsNullOrWhiteSpace(_vehicle.Notes))
+                        {
+                            <MudPaper Elevation="0" Class="crm-vehicle-notes">
+                                <MudText Typo="Typo.overline" Class="mb-1">Vehicle narrative</MudText>
+                                <MudText Typo="Typo.body2">@_vehicle.Notes</MudText>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </VehicleCard>
+            </MudItem>
+            <MudItem Xs="12" Lg="7">
+                <MudPaper Elevation="1" Class="crm-detail-tabs">
+                    <MudTabs Rounded="true" ApplyEffects="true" KeepPanelsAlive="true">
+                        <MudTabPanel Text="Invoices" Icon="@Icons.Material.Filled.ReceiptLong">
+                            <HistoryTable Items="@InvoiceEntries"
+                                          PrimaryLabel="Invoice"
+                                          SecondaryLabel="Date"
+                                          TertiaryLabel="Amount" />
+                        </MudTabPanel>
+                        <MudTabPanel Text="Appointments" Icon="@Icons.Material.Filled.EventAvailable">
+                            <HistoryTable Items="@AppointmentEntries"
+                                          PrimaryLabel="When"
+                                          SecondaryLabel="Subject"
+                                          TertiaryLabel="Owner" />
+                        </MudTabPanel>
+                    </MudTabs>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public Guid VehicleId { get; set; }
+
+    private VehicleDetail? _vehicle;
+    private bool _isLoading;
+
+    private IReadOnlyList<HistoryEntry> InvoiceEntries => _vehicle?.Invoices
+        .OrderByDescending(invoice => invoice.IssuedOn)
+        .Select(invoice => new HistoryEntry(
+            invoice.InvoiceNumber,
+            invoice.IssuedOn.ToString("MMM dd, yyyy"),
+            FormatCurrency(invoice.Amount),
+            null,
+            invoice.Status,
+            StatusColorCatalog.Resolve(invoice.Status)))
+        .ToList() ?? Array.Empty<HistoryEntry>();
+
+    private IReadOnlyList<HistoryEntry> AppointmentEntries => _vehicle?.Appointments
+        .OrderBy(a => a.ScheduledFor)
+        .Select(appointment => new HistoryEntry(
+            appointment.ScheduledFor.ToLocalTime().ToString("MMM dd, yyyy h:mm tt"),
+            appointment.Subject,
+            appointment.Owner,
+            null,
+            appointment.Status,
+            StatusColorCatalog.Resolve(appointment.Status)))
+        .ToList() ?? Array.Empty<HistoryEntry>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _vehicle = await VehicleRegistry.GetVehicleAsync(VehicleId);
+        _isLoading = false;
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/vehicles");
+    }
+
+    private string GetCustomerUrl(Guid customerId)
+    {
+        return $"/customers/{customerId}";
+    }
+
+    private static string FormatCurrency(decimal amount)
+    {
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+
+    private static string FormatServiceDate(DateTime? date)
+    {
+        return date.HasValue ? date.Value.ToString("MMM dd, yyyy") : "not yet";
+    }
+}
