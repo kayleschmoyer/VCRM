@@ -12,4 +12,6 @@ public interface IVehicleService
     Task<IReadOnlyList<VehicleSummary>> GetVehiclesAsync(CancellationToken cancellationToken = default);
 
     Task<VehicleDetail?> GetVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default);
+
+    Task<VehicleDetail> SaveVehicleAsync(VehicleDetail vehicle, CancellationToken cancellationToken = default);
 }

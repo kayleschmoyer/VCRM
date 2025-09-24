@@ -1,7 +1,10 @@
 // Program.cs: Configures dependency injection, security, and MudBlazor services for the CRM Adapter UI.
+using System.IO;
 using System.Net.Http.Headers;
 using CRMAdapter.UI.Auth;
 using CRMAdapter.UI.Core.DataSource;
+using CRMAdapter.UI.Core.Storage;
+using CRMAdapter.UI.Core.Sync;
 using CRMAdapter.UI.Hosting;
 using CRMAdapter.UI.Infrastructure.Security;
 using CRMAdapter.UI.Navigation;
@@ -23,6 +26,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Hosting;
 using MudBlazor;
 using MudBlazor.Services;
 
@@ -84,6 +88,28 @@ builder.Services.AddSingleton<NavigationMenuService>();
 builder.Services.AddScoped<AppThemeState>();
 builder.Services.AddScoped<CorrelationContext>();
 builder.Services.Configure<DataSourceOptions>(builder.Configuration.GetSection("DataSource"));
+builder.Services.Configure<OfflineSyncOptions>(builder.Configuration.GetSection(OfflineSyncOptions.SectionName));
+
+builder.Services.AddSingleton<OfflineSyncState>();
+
+if (OperatingSystem.IsBrowser())
+{
+    builder.Services.AddScoped<ILocalCache, IndexedDbCache>();
+}
+else
+{
+    builder.Services.AddSingleton<ILocalCache>(sp =>
+    {
+        var environment = sp.GetRequiredService<IHostEnvironment>();
+        var cachePath = Path.Combine(environment.ContentRootPath, "offline-cache");
+        return new FileSystemCache(cachePath);
+    });
+}
+
+builder.Services.AddSingleton<ISyncQueue, SyncQueue>();
+builder.Services.AddSingleton<IChangeDispatcher, ChangeDispatcher>();
+builder.Services.AddHostedService<BackgroundSyncWorker>();
+builder.Services.AddScoped<ConnectivityMonitor>();
 
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:5001";
 var apiBaseAddress = new Uri(apiBaseUrl);

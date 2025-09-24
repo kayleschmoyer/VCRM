@@ -1,0 +1,35 @@
+@* OfflineBanner.razor: Displays a prominent banner while the app is offline. *@
+@inject CRMAdapter.UI.Core.Sync.OfflineSyncState SyncState
+@implements IDisposable
+
+@if (_isOffline)
+{
+    <MudAlert Severity="Severity.Warning" Elevation="0" Class="offline-banner" Icon="@Icons.Material.Filled.CloudOff">
+        Offline Mode: Changes will sync automatically when reconnected.
+    </MudAlert>
+}
+
+@code {
+    private bool _isOffline;
+
+    protected override void OnInitialized()
+    {
+        _isOffline = SyncState.IsOffline;
+        SyncState.StateChanged += OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        var shouldRender = _isOffline != SyncState.IsOffline;
+        _isOffline = SyncState.IsOffline;
+        if (shouldRender)
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        SyncState.StateChanged -= OnStateChanged;
+    }
+}

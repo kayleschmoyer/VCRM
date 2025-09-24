@@ -4,7 +4,9 @@
 @inject AppThemeState ThemeState
 @inject ISnackbar Snackbar
 @inject IWebHostEnvironment HostEnvironment
+@inject CRMAdapter.UI.Core.Sync.ConnectivityMonitor ConnectivityMonitor
 @implements IDisposable
+@implements IAsyncDisposable
 
 <MudLayout Class="crm-layout">
     <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" Breakpoint="Breakpoint.Md" Immediate="true" />
@@ -20,12 +22,14 @@
 
     <MudMainContent>
         <section class="crm-grid" aria-live="polite">
+            <OfflineBanner />
             <header class="crm-topbar">
                 <TopBar OnToggleNavigation="ToggleDrawer" OnThemeToggle="ToggleTheme" OnSearch="HandleSearch" />
                 @if (HostEnvironment.IsDevelopment())
                 {
                     <DataSourceSwitch />
                 }
+                <SyncStatus />
             </header>
             <main id="main-content" class="crm-content" tabindex="-1">
                 <MudPaper Class="crm-content-surface" Elevation="0">
@@ -45,6 +49,14 @@
     protected override void OnInitialized()
     {
         ThemeState.OnChange += OnThemeChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ConnectivityMonitor.InitializeAsync();
+        }
     }
 
     private void ToggleDrawer() => _isDrawerOpen = !_isDrawerOpen;
@@ -86,5 +98,11 @@
     public void Dispose()
     {
         ThemeState.OnChange -= OnThemeChanged;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        await ConnectivityMonitor.DisposeAsync();
     }
 }

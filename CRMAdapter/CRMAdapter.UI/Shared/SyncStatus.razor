@@ -1,0 +1,92 @@
+@* SyncStatus.razor: Presents queue length, last sync timestamp, and activity indicator. *@
+@inject CRMAdapter.UI.Core.Sync.OfflineSyncState SyncState
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<div class="sync-status" aria-live="polite">
+    <MudIconButton Icon="@GetIcon()" Color="Color.Inherit" Disabled="true" Class="sync-status__icon" />
+    <div class="sync-status__details">
+        <div class="sync-status__headline">@GetHeadline()</div>
+        <div class="sync-status__meta">@GetSubText()</div>
+    </div>
+</div>
+
+@code {
+    private bool _isSyncing;
+    private int _queueLength;
+    private DateTimeOffset? _lastSync;
+
+    protected override void OnInitialized()
+    {
+        _isSyncing = SyncState.IsSyncing;
+        _queueLength = SyncState.QueueLength;
+        _lastSync = SyncState.LastSuccessfulSync;
+        SyncState.StateChanged += OnStateChanged;
+        SyncState.ConflictDetected += OnConflict;
+    }
+
+    private void OnStateChanged()
+    {
+        _isSyncing = SyncState.IsSyncing;
+        _queueLength = SyncState.QueueLength;
+        _lastSync = SyncState.LastSuccessfulSync;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnConflict(CRMAdapter.UI.Core.Sync.SyncConflictNotification notification)
+    {
+        Snackbar.Add($"Conflict detected for {notification.EntityType} {notification.EntityId}. Server version kept.", Severity.Warning);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string GetHeadline()
+    {
+        if (_isSyncing)
+        {
+            return "Syncing changes…";
+        }
+
+        if (_queueLength > 0)
+        {
+            return $"{_queueLength} change(s) pending";
+        }
+
+        return "All changes synced";
+    }
+
+    private string GetSubText()
+    {
+        if (_queueLength == 0 && _lastSync.HasValue)
+        {
+            return $"Last sync: {_lastSync.Value.ToLocalTime():g}";
+        }
+
+        if (_queueLength > 0)
+        {
+            return "Waiting for connectivity";
+        }
+
+        return "No pending work";
+    }
+
+    private string GetIcon()
+    {
+        if (_isSyncing)
+        {
+            return Icons.Material.Filled.Autorenew;
+        }
+
+        if (_queueLength > 0)
+        {
+            return Icons.Material.Filled.CloudOff;
+        }
+
+        return Icons.Material.Filled.CloudDone;
+    }
+
+    public void Dispose()
+    {
+        SyncState.StateChanged -= OnStateChanged;
+        SyncState.ConflictDetected -= OnConflict;
+    }
+}

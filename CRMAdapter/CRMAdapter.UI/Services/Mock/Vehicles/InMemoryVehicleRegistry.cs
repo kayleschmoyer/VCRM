@@ -48,6 +48,12 @@ public sealed class InMemoryVehicleRegistry : IVehicleService
         return Task.FromResult(vehicle);
     }
 
+    public Task<VehicleDetail> SaveVehicleAsync(VehicleDetail vehicle, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(vehicle);
+    }
+
     private static IReadOnlyList<VehicleDetail> SeedVehicles()
     {
         var appointmentsByVehicle = AppointmentSeedData.Records
