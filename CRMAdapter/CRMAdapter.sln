@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CRMAdapter.UI", "CRMAdapter
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CRMAdapter.UI.Tests", "Tests\CRMAdapter.UI.Tests\CRMAdapter.UI.Tests.csproj", "{FB5A5B66-FFA7-448A-B667-0F8654E5D326}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonSecurity", "CommonSecurity\CommonSecurity.csproj", "{A320996F-EA30-454F-B5FA-7D9732C034BE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
                 {FB5A5B66-FFA7-448A-B667-0F8654E5D326}.Debug|Any CPU.Build.0 = Debug|Any CPU
                 {FB5A5B66-FFA7-448A-B667-0F8654E5D326}.Release|Any CPU.ActiveCfg = Release|Any CPU
                 {FB5A5B66-FFA7-448A-B667-0F8654E5D326}.Release|Any CPU.Build.0 = Release|Any CPU
+                {A320996F-EA30-454F-B5FA-7D9732C034BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {A320996F-EA30-454F-B5FA-7D9732C034BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {A320996F-EA30-454F-B5FA-7D9732C034BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {A320996F-EA30-454F-B5FA-7D9732C034BE}.Release|Any CPU.Build.0 = Release|Any CPU
         EndGlobalSection
 EndGlobal

@@ -1,6 +1,6 @@
 @* Overview.razor: Executive dashboard blending KPI cards, charts, and unified activity feed. *@
 @page "/dashboard"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
+@attribute [Authorize(Policy = RbacPolicyNames.DashboardView)]
 @inject IDashboardService Analytics
 @inject CustomerRealtimeService CustomerRealtime
 @inject InvoiceRealtimeService InvoiceRealtime

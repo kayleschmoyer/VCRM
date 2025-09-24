@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.CommonContracts.Realtime;
+using CRMAdapter.CommonSecurity;
 using CRMAdapter.UI.Auth;
 using Microsoft.Extensions.Logging;
 using MudBlazor;
@@ -60,7 +61,7 @@ public sealed class InvoiceRealtimeService : IAsyncDisposable
     private void HandleInvoicePaid(InvoicePaidEvent payload)
     {
         _logger.LogInformation("Invoice {InvoiceNumber} paid by {CustomerName}.", payload.InvoiceNumber, payload.CustomerName);
-        var isAdmin = _authStateProvider.CurrentUser.IsInRole(RolePolicies.Admin);
+        var isAdmin = _authStateProvider.CurrentUser.IsInRole(RbacRole.Admin.ToString());
         var message = isAdmin
             ? $"Invoice #{payload.InvoiceNumber} just paid"
             : $"Payment received for invoice #{payload.InvoiceNumber}";

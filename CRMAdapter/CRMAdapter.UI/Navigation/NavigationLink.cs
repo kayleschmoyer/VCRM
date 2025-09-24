@@ -1,4 +1,6 @@
-// NavigationLink.cs: Represents a routed navigation entry with role-based visibility metadata.
+// NavigationLink.cs: Represents a routed navigation entry with RBAC policy metadata.
+using CRMAdapter.CommonSecurity;
+
 namespace CRMAdapter.UI.Navigation;
 
 public sealed record NavigationLink(
@@ -6,4 +8,7 @@ public sealed record NavigationLink(
     string Icon,
     string Href,
     string Description,
-    string[] AllowedRoles);
+    RbacAction RequiredAction)
+{
+    public string PolicyName => RbacPolicy.GetPolicyName(RequiredAction);
+}

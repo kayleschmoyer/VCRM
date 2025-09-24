@@ -1,6 +1,6 @@
 @* List.razor: Financial control tower showcasing invoices with deep filtering and cross-navigation. *@
 @page "/invoices"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
+@attribute [Authorize(Policy = RbacPolicyNames.InvoiceView)]
 @inject IInvoiceService InvoiceWorkspace
 @inject InvoiceRealtimeService InvoiceRealtime
 @inject NavigationManager NavigationManager

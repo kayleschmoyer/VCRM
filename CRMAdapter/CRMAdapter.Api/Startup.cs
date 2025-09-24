@@ -8,10 +8,10 @@ using CRMAdapter.Api.Endpoints;
 using CRMAdapter.Api.Events;
 using CRMAdapter.Api.Hubs;
 using CRMAdapter.Api.Middleware;
-using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonInfrastructure;
 using CRMAdapter.Factory;
+using CRMAdapter.CommonSecurity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -90,7 +90,10 @@ public sealed class Startup
 
         JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-        services.AddAuthorization(options => AuthPolicies.Configure(options));
+        var rbacMatrix = RbacPolicy.LoadAsync(_environment).GetAwaiter().GetResult();
+        services.AddSingleton(rbacMatrix);
+        services.AddSingleton<IRbacAuthorizationService, RbacAuthorizationService>();
+        services.AddAuthorization(options => RbacPolicy.RegisterPolicies(options, rbacMatrix));
         services.AddProblemDetails();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(ConfigureSwagger);

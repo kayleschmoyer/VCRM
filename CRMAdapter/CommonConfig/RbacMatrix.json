@@ -1,0 +1,49 @@
+{
+  "roles": {
+    "Admin": [
+      "Dashboard.View",
+      "Customer.View",
+      "Customer.Edit",
+      "Customer.Search",
+      "Appointment.View",
+      "Invoice.View",
+      "Invoice.Export",
+      "Vehicle.View",
+      "Operations.View",
+      "FieldService.View",
+      "DataQuality.View",
+      "Support.View"
+    ],
+    "Manager": [
+      "Dashboard.View",
+      "Customer.View",
+      "Customer.Edit",
+      "Customer.Search",
+      "Appointment.View",
+      "Invoice.View",
+      "Vehicle.View",
+      "Operations.View",
+      "FieldService.View",
+      "DataQuality.View",
+      "Support.View"
+    ],
+    "Clerk": [
+      "Dashboard.View",
+      "Customer.View",
+      "Customer.Search",
+      "Appointment.View",
+      "Invoice.View",
+      "Vehicle.View",
+      "Operations.View",
+      "Support.View"
+    ],
+    "Tech": [
+      "Dashboard.View",
+      "Customer.View",
+      "Customer.Search",
+      "Appointment.View",
+      "Vehicle.View",
+      "FieldService.View"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 @* List.razor: Command view for searching, filtering, and managing the appointments backlog. *@
 @page "/appointments"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@attribute [Authorize(Policy = RbacPolicyNames.AppointmentView)]
 @inject IAppointmentService AppointmentBook
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar

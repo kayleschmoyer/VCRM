@@ -1,6 +1,6 @@
 @* Detail.razor: Immersive customer 360 with contextual insights and related data workspaces. *@
 @page "/customers/{CustomerId:guid}"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@attribute [Authorize(Policy = RbacPolicyNames.CustomerView)]
 @inject ICustomerService CustomerDirectory
 @inject IInvoiceService InvoiceWorkspace
 @inject NavigationManager NavigationManager
@@ -43,14 +43,18 @@
                               VehicleCount="@_customer.Vehicles.Count"
                               LastInvoiceDate="@_customer.Invoices.OrderByDescending(i => i.IssuedOn).FirstOrDefault()?.IssuedOn"
                               Notes="@_customer.Notes">
-                    <MudStack Row="true" Spacing="1" Wrap="true">
-                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NoteAdd" Color="Color.Primary">
-                            Log touchpoint
-                        </MudButton>
-                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.BuildCircle" Color="Color.Secondary">
-                            Create service case
-                        </MudButton>
-                    </MudStack>
+                    <AuthorizeView Policy="@RbacPolicyNames.CustomerEdit">
+                        <Authorized>
+                            <MudStack Row="true" Spacing="1" Wrap="true">
+                                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NoteAdd" Color="Color.Primary">
+                                    Log touchpoint
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.BuildCircle" Color="Color.Secondary">
+                                    Create service case
+                                </MudButton>
+                            </MudStack>
+                        </Authorized>
+                    </AuthorizeView>
                 </CustomerCard>
             </MudItem>
             <MudItem Xs="12" Lg="7">
@@ -112,11 +116,15 @@
                                         <StatusChip Status="@context.Status" />
                                     </MudTd>
                                     <MudTd DataLabel="Actions" Class="text-right">
-                                        <MudButton Variant="Variant.Text"
-                                                   Color="Color.Primary"
-                                                   OnClick="@(() => NavigateToInvoice(context.Id))">
-                                            View
-                                        </MudButton>
+                                        <AuthorizeView Policy="@RbacPolicyNames.InvoiceView">
+                                            <Authorized>
+                                                <MudButton Variant="Variant.Text"
+                                                           Color="Color.Primary"
+                                                           OnClick="@(() => NavigateToInvoice(context.Id))">
+                                                    View
+                                                </MudButton>
+                                            </Authorized>
+                                        </AuthorizeView>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -138,11 +146,15 @@
                                         <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
                                     </MudTd>
                                     <MudTd DataLabel="Actions" Class="text-right">
-                                        <MudButton Variant="Variant.Text"
-                                                   Color="Color.Primary"
-                                                   OnClick="@(() => NavigateToAppointment(context.Id))">
-                                            View
-                                        </MudButton>
+                                        <AuthorizeView Policy="@RbacPolicyNames.AppointmentView">
+                                            <Authorized>
+                                                <MudButton Variant="Variant.Text"
+                                                           Color="Color.Primary"
+                                                           OnClick="@(() => NavigateToAppointment(context.Id))">
+                                                    View
+                                                </MudButton>
+                                            </Authorized>
+                                        </AuthorizeView>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>

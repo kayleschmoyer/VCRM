@@ -1,9 +1,11 @@
 @* List.razor: Customers workspace landing page with responsive table, instant filtering, and action affordances. *@
 @page "/customers"
-@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@attribute [Authorize(Policy = RbacPolicyNames.CustomerView)]
 @inject ICustomerService CustomerDirectory
 @inject CustomerRealtimeService CustomerRealtime
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IRbacAuthorizationService RbacAuthorization
 
 <MudStack Spacing="3" Class="crm-customers-container">
     <MudStack Spacing="0.5">
@@ -58,7 +60,8 @@
                 <MudTd DataLabel="Vehicles" Align="DataGridCellAlign.Center">@context.VehicleCount</MudTd>
                 <MudTd DataLabel="Last invoice">@FormatLastInvoiceDate(context.LastInvoiceDate)</MudTd>
                 <MudTd DataLabel="Actions" Class="text-right">
-                    <ActionButtons OnView="@(() => NavigateToDetail(context.Id))" />
+                    <ActionButtons OnView="@(() => NavigateToDetail(context.Id))"
+                                   EditEnabled="@_canEditCustomers" />
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -104,9 +107,13 @@
     private IDisposable? _customerCreatedSubscription;
     private IDisposable? _customerUpdatedSubscription;
     private IDisposable? _reconnectedSubscription;
+    private bool _canEditCustomers;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _canEditCustomers = RbacAuthorization.HasAccess(authState.User, RbacAction.CustomerEdit);
+
         _isLoading = true;
         await ReloadCustomersAsync();
         _isLoading = false;

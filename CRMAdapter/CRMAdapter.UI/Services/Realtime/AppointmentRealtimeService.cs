@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using CRMAdapter.CommonContracts.Realtime;
+using CRMAdapter.CommonSecurity;
 using CRMAdapter.UI.Auth;
 using Microsoft.Extensions.Logging;
 using MudBlazor;
@@ -48,7 +49,7 @@ public sealed class AppointmentRealtimeService : IAsyncDisposable
     {
         _logger.LogInformation("Appointment scheduled for {CustomerName} on {Scheduled}.", payload.CustomerName, payload.ScheduledFor);
         var localTime = payload.ScheduledFor.ToLocalTime().ToString("h:mm tt", CultureInfo.CurrentCulture);
-        var isClerk = _authStateProvider.CurrentUser.IsInRole(RolePolicies.Clerk);
+        var isClerk = _authStateProvider.CurrentUser.IsInRole(RbacRole.Clerk.ToString());
         var message = isClerk
             ? $"New appointment scheduled at {localTime}"
             : $"Appointment booked for {payload.CustomerName} · {localTime}";

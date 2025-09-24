@@ -8,17 +8,9 @@
     <MudText Typo="Typo.subtitle2" Class="crm-nav-heading" Role="heading" AriaLevel="2">Workspace Modules</MudText>
     @foreach (var link in _links)
     {
-        <MudNavLink Href="@link.Href"
-                    Icon="@link.Icon"
-                    Match="NavLinkMatch.Prefix"
-                    DisableRipple="true"
-                    Class="@GetLinkClass(link)"
-                    OnClick="() => HandleNavigationAsync(link)">
-            <div class="crm-nav-link-content">
-                <span class="crm-nav-link-title">@link.Title</span>
-                <span class="crm-nav-link-description">@link.Description</span>
-            </div>
-        </MudNavLink>
+        <RoleAwareNav Link="@link"
+                      CssClass="@GetLinkClass(link)"
+                      OnNavigate="() => HandleNavigationAsync(link)" />
     }
 </MudNavMenu>
 

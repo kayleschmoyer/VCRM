@@ -109,7 +109,7 @@
             return roleClaim;
         }
 
-        var roles = RolePolicies.AllRoles.Where(user.IsInRole).ToArray();
+        var roles = Enum.GetNames<RbacRole>().Where(user.IsInRole).ToArray();
         return roles.Length > 0 ? string.Join(", ", roles) : "Collaborator";
     }
 

@@ -3,9 +3,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonDomain;
+using CRMAdapter.CommonSecurity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -37,7 +37,7 @@ public static class VehiclesEndpoint
             .WithName("GetVehicleById")
             .WithSummary("Retrieves a canonical vehicle by identifier.")
             .WithDescription("Returns the canonical vehicle aggregate exposed by the adapter layer.")
-            .RequireAuthorization(AuthPolicies.VehicleRead)
+            .RequireAuthorization(RbacPolicy.GetPolicyName(RbacAction.VehicleView))
             .Produces<Vehicle>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized);
