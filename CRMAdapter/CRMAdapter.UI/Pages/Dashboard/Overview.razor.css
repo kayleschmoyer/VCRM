@@ -1,0 +1,18 @@
+/* Overview.razor.css: Gives the executive dashboard a polished layout with breathing room and animation. */
+.crm-dashboard-overview {
+    padding-bottom: 2rem;
+}
+
+.crm-dashboard-activity {
+    padding: 1.5rem;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.crm-dashboard-activity table {
+    width: 100%;
+}
+
+.crm-dashboard-activity .mud-table-cell {
+    vertical-align: middle;
+}

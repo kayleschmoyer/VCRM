@@ -1,0 +1,145 @@
+@* Detail.razor: Rich detail workspace for a single appointment with entity links and actions. *@
+@page "/appointments/{AppointmentId:guid}"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject IAppointmentBook AppointmentBook
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="3" Class="crm-appointment-detail">
+    <MudButton Variant="Variant.Text"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               Color="Color.Default"
+               OnClick="NavigateBack">
+        Back to appointments
+    </MudButton>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="0" Class="pa-6 text-center">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else if (_appointment is null)
+    {
+        <MudPaper Elevation="1" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.EventBusy" Color="Color.Secondary" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.subtitle1">We couldn’t locate that appointment</MudText>
+            <MudText Typo="Typo.caption" Class="mud-secondary-text">It may have been removed. Return to the schedule to continue.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem Xs="12" Md="4">
+                <MudPaper Elevation="1" Class="crm-appointment-header" aria-label="Appointment summary">
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.overline" Class="mud-secondary-text">Appointment</MudText>
+                        <MudText Typo="Typo.h5">@_appointment.AppointmentNumber</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-secondary-text">@FormatSchedule(_appointment.ScheduledStart, _appointment.ScheduledEnd)</MudText>
+                        <MudChip Color="@StatusColorCatalog.Resolve(_appointment.Status)"
+                                 Variant="Variant.Filled"
+                                 Size="Size.Small"
+                                 Class="crm-status-chip">@_appointment.Status</MudChip>
+                        <MudDivider />
+                        <MudStack Spacing="0.5">
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">Created @FormatDate(_appointment.CreatedOn)</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">Last updated @FormatDate(_appointment.LastUpdatedOn)</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem Xs="12" Md="4">
+                <MudPaper Elevation="1" Class="crm-appointment-card" aria-label="Customer and vehicle">
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.subtitle2">Customer</MudText>
+                        <MudLink Href="@($"/customers/{_appointment.Customer.Id}")" data-cy="customer-link">@_appointment.Customer.Name</MudLink>
+                        <MudText Typo="Typo.caption" Class="mud-secondary-text">@_appointment.Customer.Email · @_appointment.Customer.Phone</MudText>
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2">Vehicle</MudText>
+                        <MudLink Href="@($"/vehicles/{_appointment.Vehicle.Id}")" data-cy="vehicle-link">@_appointment.Vehicle.DisplayName</MudLink>
+                        <MudText Typo="Typo.caption" Class="mud-secondary-text">VIN @_appointment.Vehicle.Vin · @_appointment.Vehicle.Status</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem Xs="12" Md="4">
+                <MudPaper Elevation="1" Class="crm-appointment-card" aria-label="Actions">
+                    <MudStack Spacing="1.5">
+                        <MudText Typo="Typo.subtitle2">Quick actions</MudText>
+                        <MudStack Spacing="0.5">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="MarkCompleted">Mark completed</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Update" OnClick="Reschedule">Reschedule</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel" OnClick="Cancel">Cancel appointment</MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem Xs="12">
+                <MudPaper Elevation="1" Class="crm-appointment-card">
+                    <MudStack Spacing="1.5">
+                        <MudText Typo="Typo.subtitle1">Service details</MudText>
+                        <MudStack Spacing="0.5">
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Build" Color="Color.Secondary" />
+                                <MudText Typo="Typo.body1">@_appointment.Service</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body2">@_appointment.Description</MudText>
+                            <MudDivider />
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">Technician</MudText>
+                            <MudText Typo="Typo.subtitle2">@_appointment.Technician</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">Location: @_appointment.Location</MudText>
+                        </MudStack>
+                        <MudPaper Elevation="0" Class="crm-appointment-notes-block">
+                            <MudText Typo="Typo.caption" Class="mud-secondary-text">Notes</MudText>
+                            <MudText Typo="Typo.body2">@_appointment.Notes</MudText>
+                        </MudPaper>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public Guid AppointmentId { get; set; }
+
+    private AppointmentDetail? _appointment;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _appointment = await AppointmentBook.GetAppointmentAsync(AppointmentId);
+        _isLoading = false;
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/appointments");
+    }
+
+    private void Reschedule()
+    {
+        Snackbar.Add("Rescheduling workflows will connect to dispatch soon.", Severity.Info);
+    }
+
+    private void Cancel()
+    {
+        Snackbar.Add("Cancellation routing is not yet wired to the back-end.", Severity.Warning);
+    }
+
+    private void MarkCompleted()
+    {
+        Snackbar.Add("Technician completion acknowledgement coming soon.", Severity.Success);
+    }
+
+    private static string FormatSchedule(DateTime start, DateTime end)
+    {
+        return $"{start.ToLocalTime():MMM dd, yyyy · h:mm tt} – {end.ToLocalTime():h:mm tt}";
+    }
+
+    private static string FormatDate(DateTime value)
+    {
+        return value.ToLocalTime().ToString("MMM dd, yyyy h:mm tt");
+    }
+}

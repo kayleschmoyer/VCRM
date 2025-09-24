@@ -10,3 +10,12 @@
 .crm-history-table .mud-chip {
     font-weight: 600;
 }
+
+.crm-history-selectable tr {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.crm-history-selectable tr:hover {
+    transform: translateX(4px);
+}

@@ -1,0 +1,33 @@
+/* Detail.razor.css: Applies responsive layout, glass panels, and spacing for appointment details. */
+.crm-appointment-detail {
+    padding-bottom: 2rem;
+}
+
+.crm-appointment-header,
+.crm-appointment-card {
+    padding: 1.75rem;
+    border-radius: 20px;
+}
+
+.crm-appointment-header {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(139, 92, 246, 0.16));
+}
+
+body.mud-theme-dark .crm-appointment-header {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(167, 139, 250, 0.2));
+}
+
+.crm-status-chip {
+    align-self: flex-start;
+    font-weight: 600;
+}
+
+.crm-appointment-notes-block {
+    padding: 1rem;
+    border-radius: 14px;
+    background-color: rgba(148, 163, 184, 0.12);
+}
+
+body.mud-theme-dark .crm-appointment-notes-block {
+    background-color: rgba(30, 41, 59, 0.6);
+}

@@ -128,6 +128,7 @@
                                     <MudTh>Subject</MudTh>
                                     <MudTh>Owner</MudTh>
                                     <MudTh>Status</MudTh>
+                                    <MudTh class="text-right">Actions</MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
                                     <MudTd DataLabel="When">@context.ScheduledFor.ToLocalTime().ToString("MMM dd, yyyy h:mm tt")</MudTd>
@@ -135,6 +136,13 @@
                                     <MudTd DataLabel="Owner">@context.Owner</MudTd>
                                     <MudTd DataLabel="Status">
                                         <MudChip Color="@StatusColorCatalog.Resolve(context.Status)" Variant="Variant.Outlined" Size="Size.Small">@context.Status</MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Actions" Class="text-right">
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => NavigateToAppointment(context.Id))">
+                                            View
+                                        </MudButton>
                                     </MudTd>
                                 </RowTemplate>
                             </MudTable>
@@ -187,5 +195,10 @@
     private void NavigateToInvoice(Guid invoiceId)
     {
         NavigationManager.NavigateTo($"/invoices/{invoiceId}");
+    }
+
+    private void NavigateToAppointment(Guid appointmentId)
+    {
+        NavigationManager.NavigateTo($"/appointments/{appointmentId}");
     }
 }

@@ -1,0 +1,152 @@
+@* Schedule.razor: Weekly calendar-inspired visualization of appointments with mobile-friendly layout. *@
+@page "/appointments/schedule"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk},{RolePolicies.Tech}")]
+@inject IAppointmentBook AppointmentBook
+@inject NavigationManager NavigationManager
+
+<MudStack Spacing="3" Class="crm-appointments-schedule">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudStack Spacing="0.5">
+            <MudText Typo="Typo.h4">Schedule</MudText>
+            <MudText Typo="Typo.body2" Class="mud-secondary-text">Review technician load across the week and drill into details.</MudText>
+        </MudStack>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.List"
+                   OnClick="NavigateToList">
+            Back to list
+        </MudButton>
+    </MudStack>
+
+    <MudPaper Elevation="1" Class="crm-schedule-controls">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Wrap="true">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Default" OnClick="PreviousWeek" AriaLabel="Previous week" />
+            <MudText Typo="Typo.subtitle1">Week of @_currentWeekStart.ToString("MMM dd, yyyy")</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Default" OnClick="NextWeek" AriaLabel="Next week" />
+            <MudSpacer />
+            <MudSelect T="string" Label="Status" Value="@_statusFilter" ValueChanged="OnStatusFilterChanged" Clearable="true" Dense="true">
+                @foreach (var status in _statuses)
+                {
+                    <MudSelectItem Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="0" Class="pa-6 text-center">
+            <MudProgressCircular Indeterminate="true" />
+        </MudPaper>
+    }
+    else
+    {
+        <div class="crm-schedule-grid" role="grid">
+            @foreach (var day in _weekDays)
+            {
+                var appointments = GetAppointmentsForDay(day).ToList();
+                <div class="crm-schedule-day" role="gridcell">
+                    <div class="crm-schedule-day-header">
+                        <span class="crm-schedule-day-name">@day.ToString("ddd")</span>
+                        <span class="crm-schedule-day-date">@day.ToString("MMM dd")</span>
+                    </div>
+                    <MudStack Spacing="1">
+                        @if (!appointments.Any())
+                        {
+                            <MudPaper Elevation="0" Class="crm-schedule-empty">
+                                <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Size="Size.Small" Class="mud-secondary-text" />
+                                <MudText Typo="Typo.caption" Class="mud-secondary-text">No appointments</MudText>
+                            </MudPaper>
+                        }
+                        else
+                        {
+                            @foreach (var appointment in appointments)
+                            {
+                                <AppointmentCard Appointment="@appointment" OnView="HandleView" />
+                            }
+                        }
+                    </MudStack>
+                </div>
+            }
+        </div>
+    }
+</MudStack>
+
+@code {
+    private readonly List<AppointmentSummary> _appointments = new();
+    private IReadOnlyList<string> _statuses = Array.Empty<string>();
+    private DateTime _currentWeekStart = GetWeekStart(DateTime.Today);
+    private List<DateTime> _weekDays = new();
+    private string? _statusFilter;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _statuses = await AppointmentBook.GetStatusesAsync();
+        await LoadAppointmentsAsync();
+        BuildWeek();
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        var start = DateTime.SpecifyKind(_currentWeekStart, DateTimeKind.Local).ToUniversalTime();
+        var end = DateTime.SpecifyKind(_currentWeekStart.AddDays(7), DateTimeKind.Local).ToUniversalTime();
+        var results = await AppointmentBook.GetAppointmentsAsync(start, end, _statusFilter);
+        _appointments.Clear();
+        _appointments.AddRange(results);
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private void BuildWeek()
+    {
+        _weekDays = Enumerable.Range(0, 7)
+            .Select(offset => _currentWeekStart.AddDays(offset))
+            .ToList();
+    }
+
+    private IEnumerable<AppointmentSummary> GetAppointmentsForDay(DateTime day)
+    {
+        return _appointments.Where(appointment => appointment.ScheduledStart.ToLocalTime().Date == day.Date);
+    }
+
+    private Task OnStatusFilterChanged(string? status)
+    {
+        _statusFilter = status;
+        return LoadAppointmentsAsync();
+    }
+
+    private async Task PreviousWeek()
+    {
+        _currentWeekStart = _currentWeekStart.AddDays(-7);
+        BuildWeek();
+        await LoadAppointmentsAsync();
+    }
+
+    private async Task NextWeek()
+    {
+        _currentWeekStart = _currentWeekStart.AddDays(7);
+        BuildWeek();
+        await LoadAppointmentsAsync();
+    }
+
+    private void HandleView(AppointmentSummary appointment)
+    {
+        NavigationManager.NavigateTo($"/appointments/{appointment.Id}");
+    }
+
+    private void NavigateToList()
+    {
+        NavigationManager.NavigateTo("/appointments");
+    }
+
+    private static DateTime GetWeekStart(DateTime reference)
+    {
+        var dayOfWeek = (int)reference.DayOfWeek;
+        var offset = (dayOfWeek + 6) % 7; // Monday as week start
+        return reference.Date.AddDays(-offset);
+    }
+}

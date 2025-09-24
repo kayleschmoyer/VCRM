@@ -13,8 +13,9 @@ public sealed class NavigationMenuService
 {
     private static readonly IReadOnlyList<NavigationLink> Links = new List<NavigationLink>
     {
-        new("Command Center", Icons.Material.Filled.DashboardCustomize, "/", "Executive overview with actionable KPIs.", RolePolicies.AllRoles),
+        new("Dashboard", Icons.Material.Filled.Insights, "/dashboard", "Executive overview with actionable KPIs.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
         new("Customers", Icons.Material.Filled.PeopleAlt, "/customers", "360° customer directory and relationship insights.", RolePolicies.AllRoles),
+        new("Appointments", Icons.Material.Filled.EventAvailable, "/appointments", "Scheduling, technician dispatch, and service visibility.", RolePolicies.AllRoles),
         new("Invoices", Icons.Material.Filled.ReceiptLong, "/invoices", "Billing performance, balances, and payment activity.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),
         new("Vehicles", Icons.Material.Filled.DirectionsCar, "/vehicles", "Unified fleet management and service visibility.", RolePolicies.AllRoles),
         new("Operations", Icons.Material.Filled.PrecisionManufacturing, "/operations", "Order orchestration and fulfillment visibility.", new[] { RolePolicies.Admin, RolePolicies.Manager, RolePolicies.Clerk }),

@@ -1,0 +1,18 @@
+/* KpiCard.razor.css: Provides elevation, glow, and hover transitions for KPI modules. */
+.crm-kpi-card {
+    padding: 1.5rem;
+    border-radius: 18px;
+    display: block;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.45);
+}
+
+.crm-kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 40px -16px rgba(15, 23, 42, 0.55);
+}
+
+.crm-kpi-value {
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}

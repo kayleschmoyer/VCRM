@@ -1,0 +1,21 @@
+/* ChartWrapper.razor.css: Ensures charts share uniform padding, rounded corners, and entry animation. */
+.crm-chart-card {
+    padding: 1.75rem;
+    border-radius: 20px;
+    animation: fade-up 0.6s ease both;
+}
+
+.crm-chart {
+    min-height: 240px;
+}
+
+@keyframes fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

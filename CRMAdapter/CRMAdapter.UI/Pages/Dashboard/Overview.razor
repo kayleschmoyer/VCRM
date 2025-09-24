@@ -1,0 +1,136 @@
+@* Overview.razor: Executive dashboard blending KPI cards, charts, and unified activity feed. *@
+@page "/dashboard"
+@attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
+@inject IDashboardAnalytics Analytics
+
+<MudStack Spacing="3" Class="crm-dashboard-overview">
+    <MudStack Spacing="0.5">
+        <MudText Typo="Typo.h4">Executive command center</MudText>
+        <MudText Typo="Typo.body2" Class="mud-secondary-text">Real-time KPIs, revenue signals, and service momentum.</MudText>
+    </MudStack>
+
+    @if (_snapshot is null)
+    {
+        <MudPaper Elevation="0" Class="pa-6 text-center">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="2">
+            <MudItem Xs="12" Sm="6" Md="3">
+                <KpiCard Label="Total customers" Value="@_snapshot.TotalCustomers" Icon="@Icons.Material.Filled.Groups" IconColor="Color.Primary" />
+            </MudItem>
+            <MudItem Xs="12" Sm="6" Md="3">
+                <KpiCard Label="Active vehicles" Value="@_snapshot.ActiveVehicles" Icon="@Icons.Material.Filled.DirectionsCar" IconColor="Color.Secondary" />
+            </MudItem>
+            <MudItem Xs="12" Sm="6" Md="3">
+                <KpiCard Label="Outstanding invoices" Value="@_snapshot.OutstandingInvoices" Icon="@Icons.Material.Filled.ReceiptLong" IconColor="Color.Error" />
+            </MudItem>
+            <MudItem Xs="12" Sm="6" Md="3">
+                <KpiCard Label="Upcoming appointments" Value="@_snapshot.UpcomingAppointments" Icon="@Icons.Material.Filled.EventAvailable" IconColor="Color.Info" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Spacing="2">
+            <MudItem Xs="12" Md="6">
+                <ChartWrapper Title="Monthly revenue"
+                              Subtitle="Rolling invoice capture"
+                              ChartType="ChartType.Bar"
+                              Labels="@_monthlyRevenueLabels"
+                              Series="@_monthlyRevenueSeries" />
+            </MudItem>
+            <MudItem Xs="12" Md="6">
+                <ChartWrapper Title="Appointment status"
+                              Subtitle="Distribution across lifecycle"
+                              ChartType="ChartType.Pie"
+                              Labels="@_statusLabels"
+                              Series="@_statusSeries" />
+            </MudItem>
+            <MudItem Xs="12" Md="6">
+                <ChartWrapper Title="Vehicles serviced"
+                              Subtitle="Completed appointments per month"
+                              ChartType="ChartType.Line"
+                              Labels="@_vehiclesServicedLabels"
+                              Series="@_vehiclesServicedSeries" />
+            </MudItem>
+            <MudItem Xs="12" Md="6">
+                <MudPaper Elevation="1" Class="crm-dashboard-activity" aria-label="Recent activity">
+                    <MudStack Spacing="1.5">
+                        <MudText Typo="Typo.subtitle1">Recent activity</MudText>
+                        <MudTable Items="@_snapshot.RecentActivity" Dense="true" Hover="true">
+                            <HeaderContent>
+                                <MudTh>Type</MudTh>
+                                <MudTh>Title</MudTh>
+                                <MudTh>Details</MudTh>
+                                <MudTh>Date</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Type">@context.Type</MudTd>
+                                <MudTd DataLabel="Title">
+                                    <MudLink Href="@context.Url">@context.Title</MudLink>
+                                </MudTd>
+                                <MudTd DataLabel="Details">@context.Description</MudTd>
+                                <MudTd DataLabel="Date">@context.OccurredOn.ToLocalTime().ToString("MMM dd, yyyy h:mm tt")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    private DashboardSnapshot? _snapshot;
+    private IReadOnlyList<string> _monthlyRevenueLabels = Array.Empty<string>();
+    private IReadOnlyList<ChartSeries> _monthlyRevenueSeries = Array.Empty<ChartSeries>();
+    private IReadOnlyList<string> _statusLabels = Array.Empty<string>();
+    private IReadOnlyList<ChartSeries> _statusSeries = Array.Empty<ChartSeries>();
+    private IReadOnlyList<string> _vehiclesServicedLabels = Array.Empty<string>();
+    private IReadOnlyList<ChartSeries> _vehiclesServicedSeries = Array.Empty<ChartSeries>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _snapshot = await Analytics.GetSnapshotAsync();
+        BuildCharts();
+    }
+
+    private void BuildCharts()
+    {
+        if (_snapshot is null)
+        {
+            return;
+        }
+
+        _monthlyRevenueLabels = _snapshot.MonthlyRevenue.Select(point => point.Month).ToList();
+        _monthlyRevenueSeries = new[]
+        {
+            new ChartSeries
+            {
+                Name = "Revenue",
+                Data = _snapshot.MonthlyRevenue.Select(point => (double)point.Revenue).ToArray()
+            }
+        };
+
+        _statusLabels = _snapshot.AppointmentStatusDistribution.Select(slice => slice.Status).ToList();
+        _statusSeries = new[]
+        {
+            new ChartSeries
+            {
+                Name = "Appointments",
+                Data = _snapshot.AppointmentStatusDistribution.Select(slice => (double)slice.Count).ToArray()
+            }
+        };
+
+        _vehiclesServicedLabels = _snapshot.VehiclesServiced.Select(point => point.Month).ToList();
+        _vehiclesServicedSeries = new[]
+        {
+            new ChartSeries
+            {
+                Name = "Completed",
+                Data = _snapshot.VehiclesServiced.Select(point => (double)point.CompletedCount).ToArray()
+            }
+        };
+    }
+}

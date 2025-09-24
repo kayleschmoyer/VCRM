@@ -4,8 +4,10 @@ using CRMAdapter.UI.Auth;
 using CRMAdapter.UI.Hosting;
 using CRMAdapter.UI.Infrastructure.Security;
 using CRMAdapter.UI.Navigation;
+using CRMAdapter.UI.Services.Appointments;
 using CRMAdapter.UI.Services.Customers;
 using CRMAdapter.UI.Services.Diagnostics;
+using CRMAdapter.UI.Services.Dashboard;
 using CRMAdapter.UI.Services.Invoices;
 using CRMAdapter.UI.Services.Vehicles;
 using CRMAdapter.UI.Theming;
@@ -76,6 +78,8 @@ builder.Services.AddScoped<CorrelationContext>();
 builder.Services.AddSingleton<ICustomerDirectory, InMemoryCustomerDirectory>();
 builder.Services.AddSingleton<IVehicleRegistry, InMemoryVehicleRegistry>();
 builder.Services.AddSingleton<IInvoiceWorkspace, InMemoryInvoiceWorkspace>();
+builder.Services.AddSingleton<IAppointmentBook, InMemoryAppointmentBook>();
+builder.Services.AddSingleton<IDashboardAnalytics, InMemoryDashboardAnalytics>();
 
 builder.Services.AddHttpClient(HttpClientNames.CrmApi, client =>
     {

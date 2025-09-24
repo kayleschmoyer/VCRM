@@ -1,0 +1,87 @@
+@* AppointmentCard.razor: Compact summary of an appointment with status visualization and quick metadata. *@
+<div class="crm-appointment-card" @onclick="HandleClick" tabindex="@(Clickable ? 0 : -1)" role="@(Clickable ? "button" : "group")">
+    <MudStack Spacing="1">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="1">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2" Class="crm-appointment-title">@Appointment.Service</MudText>
+                <MudText Typo="Typo.caption" Class="mud-secondary-text">@FormatTimeRange(Appointment.ScheduledStart, Appointment.ScheduledEnd)</MudText>
+            </MudStack>
+            <MudChip Color="@StatusColorCatalog.Resolve(Appointment.Status)"
+                     Variant="Variant.Outlined"
+                     Size="Size.Small"
+                     Class="crm-appointment-status">@Appointment.Status</MudChip>
+        </MudStack>
+
+        <MudDivider Class="my-1" />
+
+        <MudStack Spacing="0.5">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mud-secondary-text" />
+                <MudText Typo="Typo.body2">@Appointment.Customer.Name</MudText>
+            </MudStack>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Size="Size.Small" Class="mud-secondary-text" />
+                <MudText Typo="Typo.body2">@Appointment.Vehicle.DisplayName</MudText>
+            </MudStack>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.Build" Size="Size.Small" Class="mud-secondary-text" />
+                <MudText Typo="Typo.caption">@Appointment.Technician</MudText>
+            </MudStack>
+        </MudStack>
+
+        @if (!string.IsNullOrWhiteSpace(Appointment.NotesPreview))
+        {
+            <MudText Typo="Typo.caption" Class="crm-appointment-notes">@Appointment.NotesPreview</MudText>
+        }
+
+        @if (ShowActions)
+        {
+            <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd" Class="mt-2">
+                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew"
+                           OnClick="HandleClick">
+                    View
+                </MudButton>
+                @if (AdditionalActions is not null)
+                {
+                    @AdditionalActions
+                }
+            </MudStack>
+        }
+    </MudStack>
+</div>
+
+@code {
+    [Parameter]
+    public AppointmentSummary Appointment { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<AppointmentSummary> OnView { get; set; }
+
+    [Parameter]
+    public bool ShowActions { get; set; }
+
+    [Parameter]
+    public RenderFragment? AdditionalActions { get; set; }
+
+    private bool Clickable => OnView.HasDelegate || ShowActions;
+
+    private async Task HandleClick()
+    {
+        if (OnView.HasDelegate)
+        {
+            await OnView.InvokeAsync(Appointment);
+        }
+    }
+
+    private static string FormatTimeRange(DateTime start, DateTime end)
+    {
+        var localStart = start.ToLocalTime();
+        var localEnd = end.ToLocalTime();
+        if (localStart.Date == localEnd.Date)
+        {
+            return $"{localStart:MMM dd, yyyy h:mm tt} – {localEnd:h:mm tt}";
+        }
+
+        return $"{localStart:MMM dd h:mm tt} – {localEnd:MMM dd h:mm tt}";
+    }
+}

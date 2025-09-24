@@ -4,6 +4,7 @@ using System;
 namespace CRMAdapter.UI.Services.Customers.Models;
 
 public sealed record AppointmentRecord(
+    Guid Id,
     DateTime ScheduledFor,
     string Subject,
     string Owner,
