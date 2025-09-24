@@ -1,0 +1,178 @@
+@* TopBar.razor: Presents search, session diagnostics, and user profile actions with premium UX. *@
+@inject NavigationManager NavigationManager
+@inject AppThemeState ThemeState
+@inject CorrelationContext CorrelationContext
+@inject AuthStateProvider AppAuthStateProvider
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<MudPaper Elevation="1" Class="crm-topbar-surface" Square="true">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Size="Size.Medium" Color="Color.Inherit" aria-label="Toggle navigation" OnClick="ToggleNavigation" />
+            <MudTextField @bind-Value="_searchText"
+                          Placeholder="Search accounts, opportunities, or service cases"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="crm-search"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="false"
+                          OnKeyDown="HandleSearchKey"
+                          aria-label="Global CRM search" />
+        </MudStack>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Justify="Justify.FlexEnd" Class="crm-topbar-actions">
+            <MudTooltip Text="Correlation ID for support handoffs">
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.BubbleChart" Class="crm-correlation-chip">
+                    @CorrelationContext.ShortCorrelationId
+                </MudChip>
+            </MudTooltip>
+            <MudIconButton Icon="@(ThemeState.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.WbSunny)"
+                           Color="Color.Inherit"
+                           aria-label="Toggle theme"
+                           OnClick="ToggleTheme" />
+            <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" OffsetY="true" Class="crm-profile-menu">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="crm-profile-button">
+                        <MudAvatar Size="Size.Medium" Color="Color.Primary" Class="crm-avatar">@_initials</MudAvatar>
+                        <div class="crm-profile-copy">
+                            <span class="crm-profile-name">@_displayName</span>
+                            <span class="crm-profile-role">@_primaryRole</span>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" />
+                    </MudButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem Icon="@Icons.Material.Filled.AccountBox">View profile</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Settings">Preferences</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="SignOutAsync">Sign out</MudMenuItem>
+                </ChildContent>
+            </MudMenu>
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private string? _searchText;
+    private string _displayName = "Guest";
+    private string _primaryRole = "Sign in";
+    private string _initials = "GU";
+
+    [Parameter]
+    public EventCallback OnToggleNavigation { get; set; }
+
+    [Parameter]
+    public EventCallback OnThemeToggle { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSearch { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppAuthStateProvider.AuthenticationStateChanged += OnAuthenticationChanged;
+        await LoadUserProfileAsync(await AppAuthStateProvider.GetAuthenticationStateAsync());
+    }
+
+    private async Task LoadUserProfileAsync(AuthenticationState state)
+    {
+        var user = state.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _displayName = ResolveDisplayName(user);
+            _primaryRole = ResolvePrimaryRole(user);
+            _initials = DeriveInitials(_displayName);
+        }
+        else
+        {
+            _displayName = "Guest";
+            _primaryRole = "Sign in";
+            _initials = "GU";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string ResolveDisplayName(ClaimsPrincipal user)
+    {
+        return user.Identity?.Name
+               ?? user.FindFirst("name")?.Value
+               ?? user.FindFirst(ClaimTypes.Name)?.Value
+               ?? "Team member";
+    }
+
+    private static string ResolvePrimaryRole(ClaimsPrincipal user)
+    {
+        var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value;
+        if (!string.IsNullOrWhiteSpace(roleClaim))
+        {
+            return roleClaim;
+        }
+
+        var roles = RolePolicies.AllRoles.Where(user.IsInRole).ToArray();
+        return roles.Length > 0 ? string.Join(", ", roles) : "Collaborator";
+    }
+
+    private static string DeriveInitials(string name)
+    {
+        var segments = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length == 0)
+        {
+            return "U";
+        }
+
+        return string.Concat(segments.Select(segment => char.ToUpperInvariant(segment[0]))).Substring(0, Math.Min(2, segments.Length));
+    }
+
+    private async Task HandleSearchKey(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await TriggerSearchAsync();
+        }
+    }
+
+    private async Task TriggerSearchAsync()
+    {
+        if (OnSearch.HasDelegate)
+        {
+            await OnSearch.InvokeAsync(_searchText ?? string.Empty);
+        }
+        else
+        {
+            Snackbar.Add("Search is not configured yet. Reach out to your administrator.", Severity.Info);
+        }
+    }
+
+    private async Task ToggleNavigation() => await OnToggleNavigation.InvokeAsync();
+
+    private async Task ToggleTheme()
+    {
+        if (OnThemeToggle.HasDelegate)
+        {
+            await OnThemeToggle.InvokeAsync();
+        }
+        else
+        {
+            ThemeState.ToggleTheme();
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        await AppAuthStateProvider.SignOutAsync();
+        Snackbar.Add("You have signed out of CRM Adapter.", Severity.Success);
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+
+    private async void OnAuthenticationChanged(Task<AuthenticationState> authenticationTask)
+    {
+        var state = await authenticationTask;
+        await LoadUserProfileAsync(state);
+    }
+
+    public void Dispose()
+    {
+        AppAuthStateProvider.AuthenticationStateChanged -= OnAuthenticationChanged;
+    }
+}

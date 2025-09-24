@@ -1,0 +1,62 @@
+@* App.razor: Establishes the authenticated routing pipeline, global MudBlazor providers, and navigation fallbacks. *@
+@inject AppThemeState ThemeState
+@inject CorrelationContext CorrelationContext
+@implements IDisposable
+
+<CascadingAuthenticationState>
+    <MudThemeProvider Theme="@ThemeState.ActiveTheme" IsDarkMode="@ThemeState.IsDarkMode">
+        <MudSnackbarProvider Position="SnackbarPosition.TopCenter" MaxDisplayedSnackbars="4" SnackbarConfiguration="@ThemeState.SnackbarConfiguration">
+            <MudDialogProvider />
+            <MudPopoverProvider>
+            <Router AppAssembly="@typeof(App).Assembly" OnNavigateAsync="HandleNavigationAsync">
+                <Found Context="routeData">
+                    <ErrorBoundary>
+                        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                            <Authorizing>
+                                <MudProgressCircular Indeterminate="true" Class="pa-6" Size="Size.Large" />
+                            </Authorizing>
+                            <NotAuthorized>
+                                <LayoutView Layout="@typeof(MainLayout)">
+                                    <MudPaper Elevation="0" Class="pa-6 ma-auto max-w-xl">
+                                        <MudText Typo="Typo.h5" Class="mb-2">Access restricted</MudText>
+                                        <MudText>You do not have the required permissions for this workspace. Contact your administrator if you believe this is an error.</MudText>
+                                    </MudPaper>
+                                </LayoutView>
+                            </NotAuthorized>
+                        </AuthorizeRouteView>
+                    </ErrorBoundary>
+                    <FocusOnNavigate RouteData="@routeData" Selector="#main-content" />
+                </Found>
+                <NotFound>
+                    <LayoutView Layout="@typeof(MainLayout)">
+                        <MudPaper Elevation="0" Class="pa-6 ma-auto max-w-xl">
+                            <MudText Typo="Typo.h5" Class="mb-2">We could not find that workspace</MudText>
+                            <MudText>Double-check the URL or select a module from the navigation menu to continue.</MudText>
+                        </MudPaper>
+                    </LayoutView>
+                </NotFound>
+            </Router>
+            </MudPopoverProvider>
+        </MudSnackbarProvider>
+</MudThemeProvider>
+</CascadingAuthenticationState>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ThemeState.OnChange += OnThemeChanged;
+    }
+
+    private async Task HandleNavigationAsync(Microsoft.AspNetCore.Components.Routing.NavigationContext context)
+    {
+        CorrelationContext.Refresh();
+        await Task.CompletedTask;
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        ThemeState.OnChange -= OnThemeChanged;
+    }
+}

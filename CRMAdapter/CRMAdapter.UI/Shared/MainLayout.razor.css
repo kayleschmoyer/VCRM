@@ -1,0 +1,83 @@
+/* MainLayout.razor.css: Styles the adaptive tri-panel layout with smooth transitions and accessibility affordances. */
+:root {
+    color-scheme: light dark;
+}
+
+.crm-layout {
+    min-height: 100vh;
+    background-color: transparent;
+}
+
+.crm-grid {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    transition: padding 0.3s ease;
+}
+
+.crm-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+}
+
+.crm-content {
+    outline: none;
+}
+
+.crm-content-surface {
+    min-height: calc(100vh - 200px);
+    padding: 1.75rem;
+    border-radius: 18px;
+    backdrop-filter: blur(18px);
+    background-color: rgba(255, 255, 255, 0.8);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+body.mud-theme-dark .crm-content-surface {
+    background-color: rgba(17, 28, 46, 0.85);
+}
+
+.crm-drawer {
+    border-right: none;
+    background: linear-gradient(180deg, rgba(11, 26, 54, 0.98) 0%, rgba(16, 32, 71, 0.95) 100%);
+    color: rgba(255, 255, 255, 0.87);
+}
+
+.crm-drawer .mud-nav-link {
+    border-radius: 12px;
+    margin: 0.25rem 0;
+    font-weight: 600;
+}
+
+.crm-drawer .mud-nav-link.mud-nav-link-active {
+    background: linear-gradient(90deg, rgba(54, 97, 255, 0.95) 0%, rgba(228, 80, 160, 0.9) 100%);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(54, 97, 255, 0.35);
+}
+
+.crm-drawer .mud-nav-link:not(.mud-nav-link-active):hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 960px) {
+    .crm-grid {
+        padding: 1rem;
+    }
+
+    .crm-content-surface {
+        padding: 1.25rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .crm-grid {
+        padding: 0.75rem;
+    }
+
+    .crm-content-surface {
+        padding: 1rem;
+        border-radius: 14px;
+    }
+}
