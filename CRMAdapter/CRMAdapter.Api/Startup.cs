@@ -57,6 +57,29 @@ public sealed class Startup
         services.Configure<JwtConfig>(_configuration.GetSection(JwtConfig.SectionName));
 
         var jwtConfig = _configuration.GetSection(JwtConfig.SectionName).Get<JwtConfig>() ?? new JwtConfig();
+        jwtConfig.Authority = jwtConfig.Authority?.Trim();
+        jwtConfig.SigningKey = jwtConfig.SigningKey?.Trim();
+        var signingKeyOverride = Environment.GetEnvironmentVariable("JWT_SIGNING_KEY");
+        if (!string.IsNullOrWhiteSpace(signingKeyOverride))
+        {
+            jwtConfig.SigningKey = signingKeyOverride.Trim();
+        }
+
+        if (!_environment.IsDevelopment())
+        {
+            jwtConfig.RequireHttpsMetadata = true;
+            if (!string.IsNullOrWhiteSpace(jwtConfig.Authority)
+                && !jwtConfig.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("JWT authority endpoints must use HTTPS outside of development environments.");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(jwtConfig.SigningKey) && string.IsNullOrWhiteSpace(jwtConfig.Authority))
+        {
+            throw new InvalidOperationException("JWT authentication requires either an Authority or a SigningKey supplied via a secure secret store.");
+        }
+
         services.AddSingleton(jwtConfig);
 
         services

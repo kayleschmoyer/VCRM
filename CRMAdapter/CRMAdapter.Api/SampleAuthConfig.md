@@ -5,20 +5,23 @@ The API enforces JWT bearer authentication with role-based authorization. The de
 
 - **Issuer**: `crm-adapter-api`
 - **Audience**: `crm-clients`
-- **Signing key**: `SuperSecureSigningKeyForCanonicalAdapter123!`
+- **Signing key**: *(Provide via `JWT_SIGNING_KEY` environment variable or secret manager; not stored in source control.)*
 - **Roles**: `Admin`, `Manager`, `Clerk`, `Tech`
 
 ## Generating a developer token
 
 The snippet below produces a short-lived JWT that satisfies the default configuration.
-It uses the same symmetric signing key shipped with the sample configuration so the token
-can be evaluated locally without standing up an identity provider.
+It expects the signing key to be supplied at runtime—either export `JWT_SIGNING_KEY`
+or load the value from your preferred secret manager before executing the script.
 
 ```powershell
 # Requires PowerShell 7+
 $issuer = "crm-adapter-api"
 $audience = "crm-clients"
-$key = "SuperSecureSigningKeyForCanonicalAdapter123!"
+$key = $env:JWT_SIGNING_KEY
+if (-not $key) {
+    throw "JWT_SIGNING_KEY environment variable is not set."
+}
 $expires = [DateTimeOffset]::UtcNow.AddHours(4)
 $claims = @(
     New-Object System.Security.Claims.Claim([System.Security.Claims.ClaimTypes]::NameIdentifier, [guid]::NewGuid().ToString()),

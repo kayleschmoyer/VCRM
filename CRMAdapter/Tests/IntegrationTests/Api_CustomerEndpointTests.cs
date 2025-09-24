@@ -17,6 +17,7 @@ using CRMAdapter.CommonDomain;
 using CRMAdapter.Factory;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
@@ -31,6 +32,7 @@ public sealed class Api_CustomerEndpointTests : IAsyncLifetime
     private readonly WebApplicationFactory<Program> _factory;
     private HttpClient? _client;
     private Guid _customerId;
+    private const string TestSigningKey = "IntegrationTestSigningKey123!";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Api_CustomerEndpointTests"/> class.
@@ -47,6 +49,13 @@ public sealed class Api_CustomerEndpointTests : IAsyncLifetime
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Jwt:SigningKey"] = TestSigningKey,
+                });
+            });
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<AdapterBundle>();
@@ -94,7 +103,7 @@ public sealed class Api_CustomerEndpointTests : IAsyncLifetime
 
     private static string GenerateToken(string role)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("SuperSecureSigningKeyForCanonicalAdapter123!"));
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestSigningKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
         var handler = new JwtSecurityTokenHandler();
         var token = handler.CreateJwtSecurityToken(
