@@ -41,6 +41,36 @@
     background-color: rgba(54, 97, 255, 0.08);
 }
 
+.crm-customer-row--new {
+    animation: crm-customer-slide-in 0.35s ease-out, crm-customer-highlight 3s ease-out;
+}
+
+.crm-customer-row--updated {
+    animation: crm-customer-highlight 2.5s ease-out;
+}
+
+@keyframes crm-customer-slide-in {
+    from {
+        transform: translateX(-12px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes crm-customer-highlight {
+    from {
+        background-color: rgba(54, 97, 255, 0.18);
+    }
+
+    to {
+        background-color: transparent;
+    }
+}
+
 .crm-email-cell {
     max-width: 260px;
     white-space: nowrap;

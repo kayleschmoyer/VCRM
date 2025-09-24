@@ -2,6 +2,7 @@
 @page "/invoices"
 @attribute [Authorize(Roles=$"{RolePolicies.Admin},{RolePolicies.Manager},{RolePolicies.Clerk}")]
 @inject IInvoiceService InvoiceWorkspace
+@inject InvoiceRealtimeService InvoiceRealtime
 @inject NavigationManager NavigationManager
 
 <MudStack Spacing="3" Class="crm-invoices-container">
@@ -181,19 +182,27 @@
 
 @code {
     private readonly int[] _rowsPerPageOptions = { 10, 25, 50 };
-    private IReadOnlyList<InvoiceSummary> _allInvoices = Array.Empty<InvoiceSummary>();
+    private List<InvoiceSummary> _allInvoices = new();
     private List<InvoiceSummary> _filteredInvoices = new();
     private MudTable<InvoiceSummary>? _table;
     private int _rowsPerPage = 10;
     private bool _isLoading;
     private string _search = string.Empty;
+    private readonly Dictionary<Guid, string> _rowStates = new();
+    private IDisposable? _invoiceCreatedSubscription;
+    private IDisposable? _invoicePaidSubscription;
+    private IDisposable? _reconnectedSubscription;
 
     protected override async Task OnInitializedAsync()
     {
         _isLoading = true;
-        _allInvoices = await InvoiceWorkspace.GetInvoicesAsync();
-        _filteredInvoices = _allInvoices.ToList();
+        await ReloadInvoicesAsync();
         _isLoading = false;
+
+        await InvoiceRealtime.EnsureConnectedAsync();
+        _invoiceCreatedSubscription = InvoiceRealtime.OnInvoiceCreated(payload => _ = OnInvoiceCreatedAsync(payload));
+        _invoicePaidSubscription = InvoiceRealtime.OnInvoicePaid(payload => _ = OnInvoicePaidAsync(payload));
+        _reconnectedSubscription = InvoiceRealtime.RegisterReconnected(() => _ = OnHubReconnectedAsync());
     }
 
     private async Task HandleSearch(string value)
@@ -223,6 +232,11 @@
             classes.Add("crm-invoice-row--overdue");
         }
 
+        if (_rowStates.TryGetValue(invoice.Id, out var stateClass))
+        {
+            classes.Add(stateClass);
+        }
+
         return string.Join(' ', classes);
     }
 
@@ -243,5 +257,124 @@
     private static string FormatCurrency(decimal amount)
     {
         return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:C}", amount);
+    }
+
+    private async Task OnInvoiceCreatedAsync(InvoiceCreatedEvent payload)
+    {
+        await InvokeAsync(() =>
+        {
+            var summary = new InvoiceSummary(
+                payload.Id,
+                payload.InvoiceNumber,
+                payload.CustomerId,
+                payload.CustomerName,
+                payload.VehicleId,
+                payload.VehicleVin,
+                payload.IssuedOn,
+                payload.Status,
+                payload.Total,
+                payload.BalanceDue);
+            UpsertInvoice(summary);
+            _ = TriggerRowStateAsync(summary.Id, "crm-invoice-row--new");
+            StateHasChanged();
+            return Task.CompletedTask;
+        });
+    }
+
+    private async Task OnInvoicePaidAsync(InvoicePaidEvent payload)
+    {
+        await InvokeAsync(() =>
+        {
+            var index = _allInvoices.FindIndex(invoice => invoice.Id == payload.Id);
+            if (index < 0)
+            {
+                return Task.CompletedTask;
+            }
+
+            var updated = _allInvoices[index] with { Status = "Paid", BalanceDue = 0m };
+            _allInvoices[index] = updated;
+
+            var filteredIndex = _filteredInvoices.FindIndex(invoice => invoice.Id == payload.Id);
+            if (filteredIndex >= 0)
+            {
+                _filteredInvoices[filteredIndex] = updated;
+            }
+
+            _ = TriggerRowStateAsync(updated.Id, "crm-invoice-row--paid");
+            StateHasChanged();
+            return Task.CompletedTask;
+        });
+    }
+
+    private Task OnHubReconnectedAsync()
+    {
+        return InvokeAsync(async () =>
+        {
+            await ReloadInvoicesAsync().ConfigureAwait(false);
+            StateHasChanged();
+        });
+    }
+
+    private void UpsertInvoice(InvoiceSummary summary)
+    {
+        var existingIndex = _allInvoices.FindIndex(invoice => invoice.Id == summary.Id);
+        if (existingIndex >= 0)
+        {
+            _allInvoices[existingIndex] = summary;
+        }
+        else
+        {
+            _allInvoices.Insert(0, summary);
+        }
+
+        var sanitized = _search.Trim();
+        if (string.IsNullOrWhiteSpace(sanitized) || Matches(summary, sanitized))
+        {
+            var filteredIndex = _filteredInvoices.FindIndex(invoice => invoice.Id == summary.Id);
+            if (filteredIndex >= 0)
+            {
+                _filteredInvoices[filteredIndex] = summary;
+            }
+            else
+            {
+                _filteredInvoices.Insert(0, summary);
+            }
+        }
+        else
+        {
+            _filteredInvoices.RemoveAll(invoice => invoice.Id == summary.Id);
+        }
+    }
+
+    private async Task TriggerRowStateAsync(Guid id, string cssClass)
+    {
+        _rowStates[id] = cssClass;
+        await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        await InvokeAsync(() =>
+        {
+            if (_rowStates.TryGetValue(id, out var existing) && existing == cssClass)
+            {
+                _rowStates.Remove(id);
+                StateHasChanged();
+            }
+        }).ConfigureAwait(false);
+    }
+
+    private async Task ReloadInvoicesAsync()
+    {
+        var invoices = await InvoiceWorkspace.GetInvoicesAsync();
+        _allInvoices = invoices.ToList();
+        var sanitized = _search.Trim();
+        _filteredInvoices = string.IsNullOrWhiteSpace(sanitized)
+            ? _allInvoices.ToList()
+            : _allInvoices.Where(invoice => Matches(invoice, sanitized)).ToList();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _invoiceCreatedSubscription?.Dispose();
+        _invoicePaidSubscription?.Dispose();
+        _reconnectedSubscription?.Dispose();
+        await Task.CompletedTask;
     }
 }

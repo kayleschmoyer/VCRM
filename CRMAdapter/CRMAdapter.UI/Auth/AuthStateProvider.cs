@@ -88,6 +88,14 @@ public sealed class AuthStateProvider : AuthenticationStateProvider
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
     }
 
+    /// <summary>
+    /// Retrieves the currently stored access token without mutating state.
+    /// </summary>
+    public Task<string?> GetAccessTokenAsync()
+    {
+        return ReadTokenAsync();
+    }
+
     private ClaimsPrincipal BuildPrincipal(string accessToken)
     {
         var token = _tokenHandler.ReadJwtToken(accessToken);
