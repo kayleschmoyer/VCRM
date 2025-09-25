@@ -1,0 +1,15 @@
+{
+  "Audit": {
+    "Sink": "File",
+    "File": {
+      "FilePath": "logs/audit.log"
+    },
+    "Sql": {
+      "ConnectionString": "Server=localhost;Database=Audit;Trusted_Connection=True;Encrypt=False;",
+      "TableName": "AuditEvents"
+    },
+    "Console": {
+      "UseConsoleColors": true
+    }
+  }
+}

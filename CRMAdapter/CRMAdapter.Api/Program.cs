@@ -1,8 +1,11 @@
 // File: Program.cs
 // Summary: Entry point for the CRMAdapter.Api application that wires up the minimal API pipeline.
+using System.IO;
 using CRMAdapter.Api.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "Config", "AuditSettings.json"), optional: true, reloadOnChange: true);
 
 SerilogConfig.Configure(builder);
 

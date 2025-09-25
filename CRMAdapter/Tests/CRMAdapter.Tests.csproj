@@ -13,6 +13,7 @@
     <ProjectReference Include="../CRMAdapter.Core/CRMAdapter.Core.csproj" />
     <ProjectReference Include="../CRMAdapter.Api/CRMAdapter.Api.csproj" />
     <ProjectReference Include="../CommonSecurity/CommonSecurity.csproj" />
+    <ProjectReference Include="../CRMAdapter.UI/CRMAdapter.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +26,7 @@
     <Compile Include="ChaosTests/**/*.cs" />
     <Compile Include="TestUtilities/**/*.cs" />
     <Compile Include="RbacTests/**/*.cs" />
+    <Compile Include="AuditTests/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,6 +47,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.8" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
     <PackageReference Include="Moq" Version="4.20.70" />
+    <PackageReference Include="bunit" Version="1.30.1" />
     <PackageReference Include="Polly" Version="8.4.0" />
     <PackageReference Include="Polly.Contrib.Simmy" Version="0.3.0" />
     <PackageReference Include="Respawn" Version="6.2.1" />

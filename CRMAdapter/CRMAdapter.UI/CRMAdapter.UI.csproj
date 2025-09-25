@@ -20,6 +20,10 @@
       <Link>Config\RbacMatrix.json</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\CommonConfig\AuditSettings.json">
+      <Link>Config\AuditSettings.json</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

@@ -50,14 +50,19 @@
                         <StatusChip Status="@_invoice.Status" Size="Size.Medium" />
                     </MudStack>
                     <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd" Wrap="true">
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Payments"
-                                   Disabled="@(_invoice.BalanceDue <= 0)"
-                                   OnClick="OpenPaymentDialogAsync"
-                                   data-testid="record-payment-button">
-                            Record payment
-                        </MudButton>
+                        <AuditActionInvoker Action="Invoice.RecordPayment"
+                                             EntityId="@(_invoice?.Id.ToString())"
+                                             OnExecute="EventCallback.Factory.Create(this, OpenPaymentDialogAsync)">
+                            @((EventCallback callback) =>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Payments"
+                                           Disabled="@(_invoice.BalanceDue <= 0)"
+                                           OnClick="callback"
+                                           data-testid="record-payment-button">
+                                    Record payment
+                                </MudButton>)
+                        </AuditActionInvoker>
                         <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.MarkEmailRead" Disabled="true">
                             Send email
                         </MudButton>

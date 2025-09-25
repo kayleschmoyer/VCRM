@@ -1,0 +1,168 @@
+@* AuditActionInvoker.razor: Wraps UI actions with centralized audit logging semantics. *@
+@using System.Security.Claims
+@using CRMAdapter.CommonSecurity
+@using CRMAdapter.UI.Services.Diagnostics
+@inject AuditLogger AuditLogger
+@inject CorrelationContext CorrelationContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@if (ChildContent is not null)
+{
+    @ChildContent(_callback)
+}
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public string Action { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? EntityId { get; set; }
+
+    [Parameter]
+    public EventCallback OnExecute { get; set; }
+
+    [Parameter]
+    public RenderFragment<EventCallback>? ChildContent { get; set; }
+
+    private EventCallback _callback;
+
+    protected override void OnParametersSet()
+    {
+        if (ChildContent is null)
+        {
+            throw new InvalidOperationException("AuditActionInvoker requires child content supplying an executable element.");
+        }
+
+        if (string.IsNullOrWhiteSpace(Action))
+        {
+            throw new InvalidOperationException("AuditActionInvoker requires a non-empty action name.");
+        }
+
+        _callback = EventCallback.Factory.Create(this, InvokeAsync);
+    }
+
+    private async Task InvokeAsync()
+    {
+        var correlationId = CorrelationContext.CurrentCorrelationId;
+        var principal = await ResolvePrincipalAsync().ConfigureAwait(false);
+        var userId = ResolveUserId(principal);
+        var role = ResolveRole(principal);
+        var maskedEntity = MaskEntityId(EntityId);
+
+        await AuditLogger.LogAsync(new AuditEvent(
+            correlationId,
+            userId,
+            role,
+            $"{Action}.Attempt",
+            maskedEntity,
+            DateTimeOffset.UtcNow,
+            AuditResult.Success,
+            new Dictionary<string, string>
+            {
+                ["origin"] = "UI",
+                ["stage"] = "Attempt",
+            })).ConfigureAwait(false);
+
+        try
+        {
+            if (OnExecute.HasDelegate)
+            {
+                await OnExecute.InvokeAsync(null).ConfigureAwait(false);
+            }
+
+            await AuditLogger.LogAsync(new AuditEvent(
+                correlationId,
+                userId,
+                role,
+                Action,
+                maskedEntity,
+                DateTimeOffset.UtcNow,
+                AuditResult.Success,
+                new Dictionary<string, string>
+                {
+                    ["origin"] = "UI",
+                    ["stage"] = "Completion",
+                })).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await AuditLogger.LogAsync(new AuditEvent(
+                correlationId,
+                userId,
+                role,
+                Action,
+                maskedEntity,
+                DateTimeOffset.UtcNow,
+                AuditResult.Failure,
+                new Dictionary<string, string>
+                {
+                    ["origin"] = "UI",
+                    ["stage"] = "Completion",
+                    ["exception"] = ex.GetType().Name,
+                })).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task<ClaimsPrincipal> ResolvePrincipalAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        return state.User;
+    }
+
+    private static string ResolveUserId(ClaimsPrincipal principal)
+    {
+        if (principal.Identity?.IsAuthenticated == true)
+        {
+            var claim = principal.FindFirst("sub")
+                ?? principal.FindFirst(ClaimTypes.NameIdentifier)
+                ?? principal.FindFirst("oid")
+                ?? principal.FindFirst("email");
+            if (claim is not null && !string.IsNullOrWhiteSpace(claim.Value))
+            {
+                return claim.Value;
+            }
+        }
+
+        return "anonymous";
+    }
+
+    private static string ResolveRole(ClaimsPrincipal principal)
+    {
+        if (principal.Identity?.IsAuthenticated == true)
+        {
+            var roleClaim = principal.FindAll(ClaimTypes.Role).Select(claim => claim.Value).FirstOrDefault()
+                ?? principal.FindAll("role").Select(claim => claim.Value).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(roleClaim))
+            {
+                return roleClaim;
+            }
+        }
+
+        return "guest";
+    }
+
+    private static string? MaskEntityId(string? entityId)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return null;
+        }
+
+        var trimmed = entityId.Trim();
+        if (Guid.TryParse(trimmed, out var guid))
+        {
+            return guid.ToString("N");
+        }
+
+        if (trimmed.Length <= 4)
+        {
+            return new string('*', trimmed.Length);
+        }
+
+        var head = trimmed[..2];
+        var tail = trimmed[^2..];
+        return string.Concat(head, new string('*', trimmed.Length - 4), tail);
+    }
+}
