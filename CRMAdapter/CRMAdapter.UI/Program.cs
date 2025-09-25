@@ -33,11 +33,14 @@ using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "Config", "AuditSettings.json"), optional: true, reloadOnChange: true);
+
 builder.Services.AddOptions();
 var rbacMatrix = RbacPolicy.LoadAsync(builder.Environment).GetAwaiter().GetResult();
 builder.Services.AddSingleton(rbacMatrix);
 builder.Services.AddSingleton<IRbacAuthorizationService, RbacAuthorizationService>();
 builder.Services.AddAuthorization(options => RbacPolicy.RegisterPolicies(options, rbacMatrix));
+builder.Services.AddAuditLogging(builder.Configuration);
 
 builder.Services.AddAuthentication(options =>
     {
@@ -91,6 +94,7 @@ builder.Services.AddScoped<JwtAuthProvider>();
 builder.Services.AddSingleton<NavigationMenuService>();
 builder.Services.AddScoped<AppThemeState>();
 builder.Services.AddScoped<CorrelationContext>();
+builder.Services.AddTransient<CorrelationDelegatingHandler>();
 builder.Services.Configure<DataSourceOptions>(builder.Configuration.GetSection("DataSource"));
 builder.Services.Configure<OfflineSyncOptions>(builder.Configuration.GetSection(OfflineSyncOptions.SectionName));
 
@@ -124,12 +128,18 @@ void ConfigureCrmClient(HttpClient client)
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 }
 
-builder.Services.AddHttpClient(HttpClientNames.CrmApi, ConfigureCrmClient);
-builder.Services.AddHttpClient<CustomerApiClient>(ConfigureCrmClient);
-builder.Services.AddHttpClient<VehicleApiClient>(ConfigureCrmClient);
-builder.Services.AddHttpClient<InvoiceApiClient>(ConfigureCrmClient);
-builder.Services.AddHttpClient<AppointmentApiClient>(ConfigureCrmClient);
-builder.Services.AddHttpClient<DashboardApiClient>(ConfigureCrmClient);
+builder.Services.AddHttpClient(HttpClientNames.CrmApi, ConfigureCrmClient)
+    .AddHttpMessageHandler<CorrelationDelegatingHandler>();
+builder.Services.AddHttpClient<CustomerApiClient>(ConfigureCrmClient)
+    .AddHttpMessageHandler<CorrelationDelegatingHandler>();
+builder.Services.AddHttpClient<VehicleApiClient>(ConfigureCrmClient)
+    .AddHttpMessageHandler<CorrelationDelegatingHandler>();
+builder.Services.AddHttpClient<InvoiceApiClient>(ConfigureCrmClient)
+    .AddHttpMessageHandler<CorrelationDelegatingHandler>();
+builder.Services.AddHttpClient<AppointmentApiClient>(ConfigureCrmClient)
+    .AddHttpMessageHandler<CorrelationDelegatingHandler>();
+builder.Services.AddHttpClient<DashboardApiClient>(ConfigureCrmClient)
+    .AddHttpMessageHandler<CorrelationDelegatingHandler>();
 
 builder.Services.AddScoped<InMemoryCustomerDirectory>();
 builder.Services.AddScoped<InMemoryVehicleRegistry>();

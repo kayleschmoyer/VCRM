@@ -56,6 +56,7 @@ public sealed class Startup
 
         services.AddOptions();
         services.AddHttpContextAccessor();
+        services.AddAuditLogging(_configuration);
         services.Configure<JwtConfig>(_configuration.GetSection(JwtConfig.SectionName));
 
         var jwtConfig = _configuration.GetSection(JwtConfig.SectionName).Get<JwtConfig>() ?? new JwtConfig();
@@ -132,6 +133,7 @@ public sealed class Startup
         }
 
         app.UseAuthentication();
+        app.UseMiddleware<AuditMiddleware>();
         app.UseAuthorization();
 
         app.UseSwagger();
