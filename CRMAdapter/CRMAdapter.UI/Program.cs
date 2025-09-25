@@ -26,12 +26,25 @@ using CRMAdapter.UI.Theming;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Hosting;
 using MudBlazor;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var commonConfigPath = Path.Combine(builder.Environment.ContentRootPath, "..", "CommonConfig");
+builder.Configuration.AddJsonFile(Path.Combine(commonConfigPath, "SecuritySettings.json"), optional: false, reloadOnChange: false);
+builder.Configuration.AddJsonFile(Path.Combine(commonConfigPath, "AuditSettings.json"), optional: true, reloadOnChange: true);
+using var bootstrapLoggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+var securityBootstrap = await SecurityBootstrapper.InitializeAsync(builder.Configuration, builder.Environment, bootstrapLoggerFactory);
+
+builder.Services.AddSingleton(securityBootstrap.Settings);
+builder.Services.AddSingleton(securityBootstrap.Secrets);
+builder.Services.AddSingleton<ISecretsProvider>(_ => securityBootstrap.Provider);
+builder.Services.AddSingleton<DataProtector>();
+builder.Services.AddSingleton<SecretsResolver>();
 
 builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "Config", "AuditSettings.json"), optional: true, reloadOnChange: true);
 
@@ -88,6 +101,7 @@ builder.Services.AddAuthentication(options =>
     });
 
 builder.Services.AddScoped<ProtectedSessionStorage>();
+builder.Services.AddScoped<EncryptedStorageService>();
 builder.Services.AddScoped<AuthStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthStateProvider>());
 builder.Services.AddScoped<JwtAuthProvider>();

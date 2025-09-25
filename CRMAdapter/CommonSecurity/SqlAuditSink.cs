@@ -1,6 +1,7 @@
 // SqlAuditSink.cs: Persists audit events to a relational database table using parameterized commands.
 using System;
 using System.Data;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -17,21 +18,42 @@ public sealed class SqlAuditSink : IAuditSink
     private readonly string? _connectionString;
     private readonly string _tableName;
     private readonly ILogger<SqlAuditSink> _logger;
+    private readonly DataProtector _dataProtector;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SqlAuditSink"/> class.
     /// </summary>
-    public SqlAuditSink(IOptions<AuditSettings> settingsAccessor, ILogger<SqlAuditSink> logger)
+    public SqlAuditSink(
+        IOptions<AuditSettings> settingsAccessor,
+        ResolvedSecrets resolvedSecrets,
+        DataProtector dataProtector,
+        ILogger<SqlAuditSink> logger)
     {
         if (settingsAccessor is null)
         {
             throw new ArgumentNullException(nameof(settingsAccessor));
         }
 
-        var settings = settingsAccessor.Value ?? throw new InvalidOperationException("Audit settings must be configured.");
-        _connectionString = settings.Sql.ConnectionString;
-        _tableName = string.IsNullOrWhiteSpace(settings.Sql.TableName) ? "AuditEvents" : settings.Sql.TableName;
+        _dataProtector = dataProtector ?? throw new ArgumentNullException(nameof(dataProtector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        var settings = settingsAccessor.Value ?? throw new InvalidOperationException("Audit settings must be configured.");
+        var configuredConnection = settings.Sql.ConnectionString;
+        if (string.IsNullOrWhiteSpace(configuredConnection))
+        {
+            if (resolvedSecrets is null)
+            {
+                throw new ArgumentNullException(nameof(resolvedSecrets));
+            }
+
+            if (!resolvedSecrets.SqlConnections.TryGetValue("Audit", out configuredConnection) || string.IsNullOrWhiteSpace(configuredConnection))
+            {
+                _logger.LogWarning("SQL audit sink could not locate an audit connection string in configuration or secret storage.");
+            }
+        }
+
+        _connectionString = SanitizeConnectionString(configuredConnection);
+        _tableName = string.IsNullOrWhiteSpace(settings.Sql.TableName) ? "AuditEvents" : settings.Sql.TableName;
     }
 
     /// <inheritdoc />
@@ -42,6 +64,9 @@ public sealed class SqlAuditSink : IAuditSink
             _logger.LogWarning("SQL audit sink is configured without a connection string. Event will be dropped.");
             return;
         }
+
+        var correlationId = auditEvent.CorrelationId ?? string.Empty;
+        var encryptedPayload = _dataProtector.Encrypt(auditEvent.ToJson(), correlationId);
 
         try
         {
@@ -58,13 +83,34 @@ public sealed class SqlAuditSink : IAuditSink
             command.Parameters.AddWithValue("@EntityId", auditEvent.EntityId ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@TimestampUtc", auditEvent.Timestamp.UtcDateTime);
             command.Parameters.AddWithValue("@Result", auditEvent.Result.ToString());
-            command.Parameters.AddWithValue("@Payload", auditEvent.ToJson());
+            command.Parameters.AddWithValue("@Payload", encryptedPayload);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to persist audit event to SQL table {AuditTable}.", _tableName);
+            throw new SecurityException($"Failed to persist audit event for correlation {correlationId}.", ex);
         }
+    }
+
+    internal string DecryptPayload(string encryptedPayload, string correlationId)
+    {
+        return _dataProtector.Decrypt(encryptedPayload, correlationId);
+    }
+
+    private static string? SanitizeConnectionString(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return null;
+        }
+
+        var builder = new SqlConnectionStringBuilder(connectionString)
+        {
+            Encrypt = true,
+            TrustServerCertificate = false,
+        };
+
+        return builder.ConnectionString;
     }
 }

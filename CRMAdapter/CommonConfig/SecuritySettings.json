@@ -1,0 +1,22 @@
+{
+  "Security": {
+    "UseKeyVault": false,
+    "VaultProvider": "Azure",
+    "VaultUrl": "",
+    "EncryptionKeyId": "CRM_ENCRYPTION_KEY_CURRENT",
+    "PreviousEncryptionKeyIds": [],
+    "Secrets": {
+      "JwtSigningKey": "CRM_JWT_SIGNING_KEY",
+      "Sql": {
+        "VastDesktop": "CRM_SQL_VAST_DESKTOP",
+        "VastOnline": "CRM_SQL_VAST_ONLINE",
+        "Audit": "CRM_SQL_AUDIT"
+      },
+      "Api": {
+        "ClientId": "CRM_API_CLIENT_ID",
+        "ClientSecret": "CRM_API_CLIENT_SECRET"
+      }
+    },
+    "AwsRegion": ""
+  }
+}

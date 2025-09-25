@@ -5,7 +5,7 @@
       "FilePath": "logs/audit.log"
     },
     "Sql": {
-      "ConnectionString": "Server=localhost;Database=Audit;Trusted_Connection=True;Encrypt=False;",
+      "ConnectionString": "",
       "TableName": "AuditEvents"
     },
     "Console": {

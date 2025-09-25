@@ -4,10 +4,12 @@ using System;
 using System.Data.Common;
 using System.IO;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security;
 using CRMAdapter.Api.Endpoints;
 using CRMAdapter.Api.Events;
 using CRMAdapter.Api.Hubs;
 using CRMAdapter.Api.Middleware;
+using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonInfrastructure;
 using CRMAdapter.Factory;
@@ -31,16 +33,19 @@ public sealed class Startup
 {
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _environment;
+    private readonly ResolvedSecrets _resolvedSecrets;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Startup"/> class.
     /// </summary>
     /// <param name="configuration">Configuration root used to populate options.</param>
     /// <param name="environment">Environment metadata for conditional behavior.</param>
-    public Startup(IConfiguration configuration, IHostEnvironment environment)
+    /// <param name="resolvedSecrets">Secret material resolved during bootstrap.</param>
+    public Startup(IConfiguration configuration, IHostEnvironment environment, ResolvedSecrets resolvedSecrets)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _resolvedSecrets = resolvedSecrets ?? throw new ArgumentNullException(nameof(resolvedSecrets));
     }
 
     /// <summary>
@@ -54,6 +59,7 @@ public sealed class Startup
             throw new ArgumentNullException(nameof(services));
         }
 
+        services.AddSingleton(_resolvedSecrets);
         services.AddOptions();
         services.AddHttpContextAccessor();
         services.AddAuditLogging(_configuration);
@@ -61,12 +67,7 @@ public sealed class Startup
 
         var jwtConfig = _configuration.GetSection(JwtConfig.SectionName).Get<JwtConfig>() ?? new JwtConfig();
         jwtConfig.Authority = jwtConfig.Authority?.Trim();
-        jwtConfig.SigningKey = jwtConfig.SigningKey?.Trim();
-        var signingKeyOverride = Environment.GetEnvironmentVariable("JWT_SIGNING_KEY");
-        if (!string.IsNullOrWhiteSpace(signingKeyOverride))
-        {
-            jwtConfig.SigningKey = signingKeyOverride.Trim();
-        }
+        jwtConfig.SigningKey = _resolvedSecrets.JwtSigningKey?.Trim();
 
         if (!_environment.IsDevelopment())
         {
@@ -80,7 +81,7 @@ public sealed class Startup
 
         if (string.IsNullOrWhiteSpace(jwtConfig.SigningKey) && string.IsNullOrWhiteSpace(jwtConfig.Authority))
         {
-            throw new InvalidOperationException("JWT authentication requires either an Authority or a SigningKey supplied via a secure secret store.");
+            throw new SecurityException("JWT authentication requires either an Authority or a SigningKey supplied via a secure secret store.");
         }
 
         services.AddSingleton(jwtConfig);
@@ -124,6 +125,7 @@ public sealed class Startup
         }
 
         app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseMiddleware<SecurityGuardMiddleware>();
         app.UseMiddleware<ExceptionMiddleware>();
         app.UseSerilogRequestLogging();
 
@@ -245,22 +247,22 @@ public sealed class Startup
 
     private string ResolveConnectionString(string backend)
     {
-        var environmentOverride = Environment.GetEnvironmentVariable("CRM_SQL_CONNECTION");
-        if (!string.IsNullOrWhiteSpace(environmentOverride))
-        {
-            return environmentOverride!;
-        }
-
         var connectionName = string.Equals(backend.Trim(), "VAST_ONLINE", StringComparison.OrdinalIgnoreCase)
             ? "VastOnline"
             : "VastDesktop";
-        var connectionString = _configuration.GetConnectionString(connectionName);
-        if (string.IsNullOrWhiteSpace(connectionString))
+
+        if (!_resolvedSecrets.SqlConnections.TryGetValue(connectionName, out var connectionString) || string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException($"Connection string '{connectionName}' is not configured.");
+            throw new SecurityException($"Connection string '{connectionName}' is not configured.");
         }
 
-        return connectionString!;
+        var builder = new SqlConnectionStringBuilder(connectionString)
+        {
+            Encrypt = true,
+            TrustServerCertificate = false,
+        };
+
+        return builder.ConnectionString;
     }
 
     private string ResolveMappingPath(string backend)
