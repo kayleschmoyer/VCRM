@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using CRMAdapter.UI.Auth.Contracts;
+using CRMAdapter.UI.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.Extensions.Logging;
@@ -17,14 +18,16 @@ public sealed class AuthStateProvider : AuthenticationStateProvider
     private const string ExpiryKey = "crm-adapter-token-expiry";
 
     private readonly ProtectedSessionStorage _sessionStorage;
+    private readonly EncryptedStorageService _encryptedStorage;
     private readonly JwtAuthProvider _jwtAuthProvider;
     private readonly ILogger<AuthStateProvider> _logger;
     private readonly JwtSecurityTokenHandler _tokenHandler = new();
     private ClaimsPrincipal _currentUser = new(new ClaimsIdentity());
 
-    public AuthStateProvider(ProtectedSessionStorage sessionStorage, JwtAuthProvider jwtAuthProvider, ILogger<AuthStateProvider> logger)
+    public AuthStateProvider(ProtectedSessionStorage sessionStorage, EncryptedStorageService encryptedStorage, JwtAuthProvider jwtAuthProvider, ILogger<AuthStateProvider> logger)
     {
         _sessionStorage = sessionStorage;
+        _encryptedStorage = encryptedStorage;
         _jwtAuthProvider = jwtAuthProvider;
         _logger = logger;
     }
@@ -106,21 +109,19 @@ public sealed class AuthStateProvider : AuthenticationStateProvider
     private Task StoreSessionAsync(JwtSession session)
     {
         return Task.WhenAll(
-            _sessionStorage.SetAsync(AccessTokenKey, session.AccessToken).AsTask(),
-            _sessionStorage.SetAsync(RefreshTokenKey, session.RefreshToken).AsTask(),
+            _encryptedStorage.SetAsync(AccessTokenKey, session.AccessToken),
+            _encryptedStorage.SetAsync(RefreshTokenKey, session.RefreshToken),
             _sessionStorage.SetAsync(ExpiryKey, session.ExpiresAt).AsTask());
     }
 
     private async Task<string?> ReadTokenAsync()
     {
-        var stored = await _sessionStorage.GetAsync<string>(AccessTokenKey);
-        return stored.Success ? stored.Value : null;
+        return await _encryptedStorage.GetAsync(AccessTokenKey);
     }
 
     private async Task<string?> ReadRefreshTokenAsync()
     {
-        var stored = await _sessionStorage.GetAsync<string>(RefreshTokenKey);
-        return stored.Success ? stored.Value : null;
+        return await _encryptedStorage.GetAsync(RefreshTokenKey);
     }
 
     private async Task<DateTimeOffset?> ReadExpiryAsync()
@@ -137,8 +138,8 @@ public sealed class AuthStateProvider : AuthenticationStateProvider
     private Task ClearAsync()
     {
         return Task.WhenAll(
-            _sessionStorage.DeleteAsync(AccessTokenKey).AsTask(),
-            _sessionStorage.DeleteAsync(RefreshTokenKey).AsTask(),
+            _encryptedStorage.DeleteAsync(AccessTokenKey),
+            _encryptedStorage.DeleteAsync(RefreshTokenKey),
             _sessionStorage.DeleteAsync(ExpiryKey).AsTask());
     }
 }
