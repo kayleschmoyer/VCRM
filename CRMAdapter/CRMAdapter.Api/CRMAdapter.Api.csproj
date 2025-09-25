@@ -41,6 +41,10 @@
       <Link>Config\AuditSettings.json</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\CommonConfig\RateLimitSettings.json">
+      <Link>Config\RateLimitSettings.json</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <None Include="Docs\openapi.xml" />
     <Content Include="..\Vast\Mapping\vast-desktop.json">
       <Link>Mappings\vast-desktop.json</Link>

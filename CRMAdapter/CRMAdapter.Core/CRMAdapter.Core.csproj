@@ -12,6 +12,7 @@
     <Compile Include="../CommonContracts/**/*.cs" />
     <Compile Include="../CommonDomain/**/*.cs" />
     <Compile Include="../CommonInfrastructure/**/*.cs" />
+    <Compile Include="../CRMAdapter.Common/**/*.cs" />
     <Compile Include="../Factory/**/*.cs" />
     <Compile Include="../VastOnline/Adapter/**/*.cs" />
     <Compile Include="../Vast/**/*.cs" />
@@ -20,5 +21,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.ApplicationInsights" Version="2.21.0" />
+    <PackageReference Include="Polly" Version="8.4.0" />
   </ItemGroup>
 </Project>
