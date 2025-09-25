@@ -1,0 +1,31 @@
+{
+  "RateLimitSettings": {
+    "WindowSeconds": 60,
+    "AuthenticatedUser": {
+      "RequestsPerMinute": 100
+    },
+    "UnauthenticatedIp": {
+      "RequestsPerMinute": 20
+    },
+    "Tenant": {
+      "Enabled": false,
+      "RequestsPerMinute": 80,
+      "HeaderName": "X-Tenant-ID",
+      "ClaimType": "tenant_id"
+    },
+    "EndpointOverrides": {
+      "/auth/token": {
+        "AuthenticatedRequestsPerMinute": 300,
+        "UnauthenticatedRequestsPerMinute": 120
+      },
+      "/health": {
+        "AuthenticatedRequestsPerMinute": 600,
+        "UnauthenticatedRequestsPerMinute": 300
+      },
+      "/metrics/rate-limit": {
+        "AuthenticatedRequestsPerMinute": 240,
+        "UnauthenticatedRequestsPerMinute": 120
+      }
+    }
+  }
+}

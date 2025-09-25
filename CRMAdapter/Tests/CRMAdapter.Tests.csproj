@@ -23,6 +23,7 @@
     <Compile Include="SmokeTests/**/*.cs" />
     <Compile Include="PerformanceTests/**/*.cs" />
     <Compile Include="SecurityTests/**/*.cs" />
+    <Compile Include="ResilienceTests/**/*.cs" />
     <Compile Include="ChaosTests/**/*.cs" />
     <Compile Include="TestUtilities/**/*.cs" />
     <Compile Include="RbacTests/**/*.cs" />

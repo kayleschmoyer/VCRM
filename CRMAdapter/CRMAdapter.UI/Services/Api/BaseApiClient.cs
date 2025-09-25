@@ -1,19 +1,27 @@
+using System;
 // BaseApiClient.cs: Shared plumbing for HTTP calls, JWT attachment, and future resiliency policies.
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using CRMAdapter.Common.Resilience;
+using Polly;
 
 namespace CRMAdapter.UI.Services.Api;
 
 public abstract class BaseApiClient
 {
-    protected BaseApiClient(HttpClient client)
+    private readonly IAsyncPolicy<HttpResponseMessage> _resiliencePolicy;
+
+    protected BaseApiClient(HttpClient client, IAsyncPolicy<HttpResponseMessage>? resiliencePolicy = null)
     {
-        Client = client;
+        Client = client ?? throw new ArgumentNullException(nameof(client));
+        _resiliencePolicy = resiliencePolicy ?? PollyPolicies.CreateHttpPolicy();
     }
 
     protected HttpClient Client { get; }
+
+    protected IAsyncPolicy<HttpResponseMessage> ResiliencePolicy => _resiliencePolicy;
 
     protected virtual ValueTask<string?> GetJwtAsync(CancellationToken cancellationToken)
     {
@@ -33,9 +41,19 @@ public abstract class BaseApiClient
         return request;
     }
 
+    protected Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        return _resiliencePolicy.ExecuteAsync(ct => Client.SendAsync(request, ct), cancellationToken);
+    }
+
     protected virtual Task ApplyResiliencyAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        // TODO: Wire Polly or HttpClientFactory policies once the live API surface is ready.
+        // Maintained for backward compatibility. Use SendAsync for resilient HTTP calls.
         return Task.CompletedTask;
     }
 }

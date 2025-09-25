@@ -10,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 var commonConfigPath = Path.Combine(builder.Environment.ContentRootPath, "..", "CommonConfig");
 builder.Configuration.AddJsonFile(Path.Combine(commonConfigPath, "AuditSettings.json"), optional: true, reloadOnChange: true);
 builder.Configuration.AddJsonFile(Path.Combine(commonConfigPath, "SecuritySettings.json"), optional: false, reloadOnChange: false);
+builder.Configuration.AddJsonFile(Path.Combine(commonConfigPath, "RateLimitSettings.json"), optional: true, reloadOnChange: true);
 builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "Config", "AuditSettings.json"), optional: true, reloadOnChange: true);
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "Config", "RateLimitSettings.json"), optional: true, reloadOnChange: true);
 
 using var bootstrapLoggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
 var securityBootstrap = await SecurityBootstrapper.InitializeAsync(builder.Configuration, builder.Environment, bootstrapLoggerFactory);

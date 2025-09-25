@@ -9,6 +9,8 @@ using CRMAdapter.Api.Endpoints;
 using CRMAdapter.Api.Events;
 using CRMAdapter.Api.Hubs;
 using CRMAdapter.Api.Middleware;
+using CRMAdapter.Api.Configuration;
+using CRMAdapter.Api.Services;
 using CRMAdapter.Api.Security;
 using CRMAdapter.CommonContracts;
 using CRMAdapter.CommonInfrastructure;
@@ -17,11 +19,13 @@ using CRMAdapter.CommonSecurity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
 namespace CRMAdapter.Api;
@@ -63,6 +67,10 @@ public sealed class Startup
         services.AddOptions();
         services.AddHttpContextAccessor();
         services.AddAuditLogging(_configuration);
+        services.Configure<RateLimitSettings>(_configuration.GetSection(RateLimitSettings.SectionName));
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<RequestCounterService>();
+
         services.Configure<JwtConfig>(_configuration.GetSection(JwtConfig.SectionName));
 
         var jwtConfig = _configuration.GetSection(JwtConfig.SectionName).Get<JwtConfig>() ?? new JwtConfig();
@@ -135,6 +143,7 @@ public sealed class Startup
         }
 
         app.UseAuthentication();
+        app.UseMiddleware<RateLimitMiddleware>();
         app.UseMiddleware<AuditMiddleware>();
         app.UseAuthorization();
 
@@ -144,6 +153,14 @@ public sealed class Startup
             options.SwaggerEndpoint("/swagger/v1/swagger.json", "CRM Adapter API v1");
             options.DisplayRequestDuration();
         });
+
+        app.MapGet("/metrics/rate-limit", (RequestCounterService counter, IOptionsMonitor<RateLimitSettings> options) =>
+        {
+            var snapshot = counter.GetMetricsSnapshot(options.CurrentValue);
+            return Results.Json(snapshot);
+        })
+        .WithName("RateLimitMetrics")
+        .AllowAnonymous();
 
         app.MapCustomersEndpoints();
         app.MapVehiclesEndpoints();
